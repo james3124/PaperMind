@@ -1,79 +1,124 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+<div align="center">
 
-# Getting Started
+# 📚 PaperMind
 
->**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
+**Write, generate, and edit complete academic research papers — entirely on your phone.**
 
-## Step 1: Start the Metro Server
+PaperMind is a fully self-contained **offline AI research-paper studio** for Android. No backend. No server. No API keys. The entire AI pipeline runs **on-device** using a local large language model, so your research stays private and works anywhere — even without an internet connection.
 
-First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
+<img src="https://img.shields.io/badge/platform-Android-brightgreen" alt="Platform: Android">
+<img src="https://img.shields.io/badge/framework-React%20Native%200.74-61dafb" alt="React Native 0.74">
+<img src="https://img.shields.io/badge/language-TypeScript-3178c6" alt="TypeScript">
+<img src="https://img.shields.io/badge/AI-On--Device%20(no%20cloud)-blueviolet" alt="On-device AI">
+<a href="https://github.com/james3124/PaperMind/releases"><img src="https://img.shields.io/badge/download-APK-ff6b6b" alt="Download APK"></a>
 
-To start Metro, run the following command from the _root_ of your React Native project:
+</div>
+
+---
+
+## ✨ What it does
+
+PaperMind turns a single research topic into a complete, citation-ready academic paper — and then gives you a full Word-style editor to refine it.
+
+| Stage | What happens |
+|---|---|
+| **Generate** | Enter a topic + optional context, pick a research type, academic level, and paper length |
+| **Plan** | The on-device AI formulates research questions, a thesis, and a full paper outline |
+| **Cite real papers** | Queries **CrossRef, OpenAlex, Semantic Scholar, and arXiv** in parallel to fetch real, deduplicated sources |
+| **Write** | Runs a **19-stage AI pipeline** to write every section: introduction, literature review, methodology, results, discussion, conclusion, abstract, and references |
+| **Polish** | Applies an academic style + proofreading pass and formats a properly cited reference list (APA, MLA, IEEE, Chicago, Harvard, Vancouver) |
+| **Edit** | Refine the paper in a rich text editor with a Word-style toolbar |
+| **Export** | Save or share as **DOCX** — generated entirely on-device |
+
+## 🎯 Benefits
+
+- 🔒 **100% Private** — All AI inference runs on your device. Your papers never leave your phone.
+- 🌍 **Works Offline** — No backend, no server, no API keys. Internet is only needed on first launch (to download the AI model) and optionally for literature search.
+- 💸 **Free Forever** — No subscriptions, no per-token billing, no cloud costs. Bring your own phone.
+- 📖 **Real citations** — References are generated from real academic sources, never invented.
+- 📝 **Word-style editor** — Bold, headings, lists, alignment, colors, links, images, footnotes, find & replace, outline view, focus mode — a familiar editing experience.
+- ✍️ **AI writing assistance** — Select any text and Rewrite, Fix Grammar, Explain, Summarize, Expand, Shorten, or switch to Academic Tone.
+- 📂 **On-device library** — Search, star, sort, duplicate, and organize all your papers.
+- 🔁 **DOCX in & out** — Import existing DOCX files and export finished papers, all locally.
+
+## 📸 Screens
+
+- **Library** — your papers, searchable, sortable, and filterable by star/status.
+- **Generate** — guided two-step flow from topic to a 19-stage generation progress screen.
+- **Editor** — a full rich-text editor with a Word-style toolbar and live word count.
+- **Settings** — AI model status, theme (light / dark / system), and about.
+
+## 🚀 Installation
+
+> **Android only.** Download the latest APK from the [Releases page](https://github.com/james3124/PaperMind/releases).
+
+1. Open the [latest release](https://github.com/james3124/PaperMind/releases/latest)
+2. Download `app-debug.apk`
+3. Open the file on your Android device and allow installation from unknown sources
+4. Launch **PaperMind** — on first run it downloads the on-device AI model (~676 MB), then you're ready to generate
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | React Native 0.74 + TypeScript |
+| Navigation | React Navigation v6 |
+| State | Zustand |
+| Database | WatermelonDB + SQLite (local) |
+| On-device AI | llama.rn + Qwen2.5-0.5B-Instruct GGUF |
+| Editor | Quill.js via WebView |
+| Literature search | CrossRef, OpenAlex, Semantic Scholar, arXiv (free, no key) |
+| DOCX in/out | jszip + react-native-fs (fully on-device) |
+| CI / APK build | GitHub Actions + Gradle |
+
+## 🏗️ Development
+
+### Prerequisites
+
+- Node 18+, Java 17, Android SDK 35
+- Complete the [React Native environment setup](https://reactnative.dev/docs/environment-setup)
+
+### Run it
 
 ```bash
-# using npm
+npm install
+
+# Start Metro
 npm start
 
-# OR using Yarn
-yarn start
-```
-
-## Step 2: Start your Application
-
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
-
-### For Android
-
-```bash
-# using npm
+# Run on Android
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### For iOS
+### Test & lint
 
 ```bash
-# using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+npm test
+npm run lint
 ```
 
-If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
+### Build the APK locally
 
-This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
+```bash
+cd android && ./gradlew assembleDebug
+# Output: android/app/build/outputs/apk/debug/app-debug.apk
+```
 
-## Step 3: Modifying your App
+> Pushing a `v*` tag triggers [GitHub Actions](.github/workflows/build_apk.yml), which builds the APK and attaches it to a new [Release](https://github.com/james3124/PaperMind/releases).
 
-Now that you have successfully run the app, let's modify it.
+## 📁 Project Structure
 
-1. Open `App.tsx` in your text editor of choice and edit some lines.
-2. For **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Developer Menu** (<kbd>Ctrl</kbd> + <kbd>M</kbd> (on Window and Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (on macOS)) to see your changes!
+```
+src/
+├── db/          # WatermelonDB setup, models, migrations
+├── stores/      # Zustand stores (settings)
+├── services/    # llamaService, pipelineService, literatureSearch, docxImport/Export
+├── screens/     # Library, Generate, Progress, Editor, Model Download, Settings
+├── components/  # editor/, library/, generate/ subcomponents
+├── navigation/  # AppNavigator
+└── utils/       # model paths, provider config
+```
 
-   For **iOS**: Hit <kbd>Cmd ⌘</kbd> + <kbd>R</kbd> in your iOS Simulator to reload the app and see your changes!
+## 📄 License
 
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [Introduction to React Native](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you can't get this to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Private project — all rights reserved.
