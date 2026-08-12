@@ -1,34 +1,40 @@
-import { PROVIDERS, getProviderConfig } from '../settingsStore';
+import { MODEL_PATH } from '../../utils/modelPaths';
 
-describe('PROVIDERS', () => {
-  it('has 7 providers', () => {
-    expect(PROVIDERS).toHaveLength(7);
+// Mock RNFS
+jest.mock('react-native-fs', () => ({
+  DocumentDirectoryPath: '/data/user/0/com.papermind/files',
+  exists: jest.fn().mockResolvedValue(false),
+  mkdir:  jest.fn().mockResolvedValue(undefined),
+}));
+
+describe('settingsStore defaults', () => {
+  it('default citation style is apa', () => {
+    const { useSettingsStore } = require('../settingsStore');
+    const state = useSettingsStore.getState();
+    expect(state.defaultCitationStyle).toBe('apa');
   });
 
-  it('all providers have required fields', () => {
-    PROVIDERS.forEach(p => {
-      expect(p.id).toBeTruthy();
-      expect(p.displayName).toBeTruthy();
-      expect(p.keyHint).toBeTruthy();
-    });
+  it('default citation edition is 7th', () => {
+    const { useSettingsStore } = require('../settingsStore');
+    const state = useSettingsStore.getState();
+    expect(state.defaultCitationEdition).toBe('7th');
   });
 
-  it('custom provider has empty baseUrl', () => {
-    const custom = PROVIDERS.find(p => p.id === 'custom');
-    expect(custom?.baseUrl).toBe('');
+  it('modelLoaded defaults to false', () => {
+    const { useSettingsStore } = require('../settingsStore');
+    const state = useSettingsStore.getState();
+    expect(state.modelLoaded).toBe(false);
+  });
+
+  it('theme defaults to system', () => {
+    const { useSettingsStore } = require('../settingsStore');
+    const state = useSettingsStore.getState();
+    expect(state.theme).toBe('system');
   });
 });
 
-describe('getProviderConfig', () => {
-  it('returns correct provider for openai', () => {
-    const p = getProviderConfig('openai');
-    expect(p.displayName).toBe('OpenAI');
-    expect(p.baseUrl).toBe('https://api.openai.com/v1');
-  });
-
-  it('falls back to first provider for unknown id', () => {
-    // @ts-expect-error testing invalid id
-    const p = getProviderConfig('unknown');
-    expect(p.id).toBe('openai');
+describe('modelPaths', () => {
+  it('MODEL_PATH includes model filename', () => {
+    expect(MODEL_PATH).toContain('qwen2.5-0.5b-instruct-q8_0.gguf');
   });
 });
