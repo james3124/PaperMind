@@ -6,6 +6,7 @@ import GenerateScreen from '@/screens/GenerateScreen';
 import ProgressScreen from '@/screens/ProgressScreen';
 import EditorScreen   from '@/screens/EditorScreen';
 import SettingsScreen from '@/screens/SettingsScreen';
+import ModelDownloadScreen from '@/screens/ModelDownloadScreen';
 
 export type RootStackParamList = {
   Library:  undefined;
@@ -20,6 +21,7 @@ export type RootStackParamList = {
   };
   Editor:   { documentId: string };
   Settings: undefined;
+  ModelDownload: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -33,6 +35,11 @@ export default function AppNavigator() {
         <Stack.Screen name="Progress" component={ProgressScreen} options={{ title: 'Generating…', headerBackVisible: false }} />
         <Stack.Screen name="Editor"   component={EditorScreen}   options={{ headerShown: false }} />
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+        <Stack.Screen
+          name="ModelDownload"
+          component={ModelDownloadScreen}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
