@@ -5,6 +5,6 @@ module.exports = {
       root: ['./src'],
       alias: { '@': './src' },
     }],
-    '@babel/plugin-proposal-decorators',
+    ['@babel/plugin-proposal-decorators', { legacy: true }],
   ],
 };
