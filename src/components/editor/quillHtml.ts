@@ -66,8 +66,23 @@ export function buildQuillHtml(initialContent: string): string {
     });
 
     // Post format at cursor to sync toolbar state
+    // Also post selected text so RN can open the AI panel
     quill.on('selection-change', (range) => {
-      if (range) postFormat(range.index);
+      if (!range) return;
+      postFormat(range.index);
+      if (range.length > 0) {
+        const selected = quill.getText(range.index, range.length).trim();
+        if (selected) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'selection-text', text: selected,
+          }));
+        }
+      } else {
+        // Deselect — close AI panel
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'selection-text', text: '',
+        }));
+      }
     });
 
     function postFormat(index) {

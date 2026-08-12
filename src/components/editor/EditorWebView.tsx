@@ -18,8 +18,9 @@ interface Props {
   onContentChange: (delta: string, wordCount: number) => void;
   onFormatChange:  (format: Record<string, unknown>) => void;
   onHeadings:      (headings: { level: number; text: string; index: number }[]) => void;
-  onReplaceResult: (count: number) => void;
-  onReady:         () => void;
+  onReplaceResult:   (count: number) => void;
+  onSelectionText?:  (text: string) => void;
+  onReady:           () => void;
 }
 
 const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
@@ -57,6 +58,9 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
           break;
         case 'replace-done':
           props.onReplaceResult(msg.count);
+          break;
+        case 'selection-text':
+          props.onSelectionText?.(msg.text ?? '');
           break;
         case 'ready':
           props.onReady();
