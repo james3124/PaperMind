@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
 import { database }    from '@/db/database';
 import AppNavigator    from '@/navigation/AppNavigator';
@@ -54,8 +55,10 @@ export default function App() {
   }
 
   return (
-    <DatabaseProvider database={database}>
-      <AppNavigator initialRoute={initialRoute} />
-    </DatabaseProvider>
+    <SafeAreaProvider>
+      <DatabaseProvider database={database}>
+        <AppNavigator initialRoute={initialRoute} />
+      </DatabaseProvider>
+    </SafeAreaProvider>
   );
 }
