@@ -17,7 +17,7 @@
     "@react-navigation/native-stack": "^6.11.0",
     "axios": "^1.7.7",
     "jszip": "^3.10.1",
-    "llama.rn": "^0.7.2",
+    "llama.rn": "^0.12.9",
     "react": "18.2.0",
     "react-native": "0.74.5",
     "react-native-document-picker": "^9.3.1",
