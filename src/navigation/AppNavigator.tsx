@@ -26,10 +26,14 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-export default function AppNavigator() {
+interface Props {
+  initialRoute: 'Library' | 'ModelDownload';
+}
+
+export default function AppNavigator({ initialRoute }: Props) {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Library">
+      <Stack.Navigator initialRouteName={initialRoute}>
         <Stack.Screen name="Library"  component={LibraryScreen}  options={{ title: 'PaperMind' }} />
         <Stack.Screen name="Generate" component={GenerateScreen} options={{ title: 'New Paper' }} />
         <Stack.Screen name="Progress" component={ProgressScreen} options={{ title: 'Generating…', headerBackVisible: false }} />
