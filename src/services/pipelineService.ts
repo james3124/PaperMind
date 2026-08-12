@@ -73,11 +73,6 @@ function formatSourcesForReferences(sources: SourcePaper[]): string {
   return sources.map((s) => JSON.stringify(s)).join('\n');
 }
 
-function citationTag(style: string, edition: string): string {
-  const num = edition.replace(/\D/g, '');
-  return num ? `${style}${num}` : style;
-}
-
 function stageEvent(stage: number, type: 'stage-start' | 'stage-complete'): PipelineEvent {
   return { type, stage, label: STAGE_LABELS[stage - 1] };
 }
@@ -242,14 +237,16 @@ async function runAbstractAndReferences(
   draft: string,
   sources: SourcePaper[]
 ): Promise<AbstractAndReferences> {
-  const citTag = citationTag(config.citationStyle, config.citationEdition);
+  // Slice to fit 2048-token context window
+  const draftSlice = draft.slice(0, 1200);
+  const sourcesSlice = sources.slice(0, 5);
 
   const prompt = `Given the following research paper draft:
 
-${draft}
+${draftSlice}
 
 Real sources used:
-${formatSourcesForReferences(sources)}
+${formatSourcesForReferences(sourcesSlice)}
 
 1. Write a structured abstract (150–250 words) covering: background, objective, methods, results, conclusion.
 2. Generate a complete References section using ONLY the provided real sources.
@@ -284,7 +281,7 @@ async function runStyleAndProofread(
 4. Return ONLY the corrected full paper text — no commentary, no preamble.
 
 Paper:
-${draft}`;
+${draft.slice(0, 1500)}`;
 
   return await complete(
     [{ role: 'user', content: prompt }],
