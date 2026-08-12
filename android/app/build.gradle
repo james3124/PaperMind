@@ -82,6 +82,9 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    aaptOptions {
+        noCompress "gguf"
+    }
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -90,6 +93,7 @@ android {
             keyPassword 'android'
         }
     }
+
     buildTypes {
         debug {
             signingConfig signingConfigs.debug

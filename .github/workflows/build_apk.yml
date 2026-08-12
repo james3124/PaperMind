@@ -15,6 +15,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Download bundled GGUF model into APK assets
+        run: |
+          mkdir -p android/app/src/main/assets/models
+          curl -fL --retry 3 -o android/app/src/main/assets/models/qwen2.5-0.5b-instruct-q8_0.gguf \
+            https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q8_0.gguf
+
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:

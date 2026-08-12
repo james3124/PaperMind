@@ -3,7 +3,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
 import { database }    from '@/db/database';
 import AppNavigator    from '@/navigation/AppNavigator';
-import { modelExists } from '@/utils/modelPaths';
+import { modelExists, bundledModelExists, copyBundledModel } from '@/utils/modelPaths';
 import { initModel }   from '@/services/llamaService';
 import { MODEL_PATH }  from '@/utils/modelPaths';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -14,20 +14,34 @@ export default function App() {
 
   useEffect(() => {
     async function checkModel() {
-      const exists = await modelExists();
-      if (!exists) {
-        setInitialRoute('ModelDownload');
+      // Already downloaded to internal storage — load straight away.
+      if (await modelExists()) {
+        await tryInitModel('Library');
         return;
       }
+
+      // Not in storage yet. If a model is bundled in the APK assets, copy it
+      // into storage once, then load. No download screen needed.
+      if (await bundledModelExists()) {
+        await copyBundledModel();
+        await tryInitModel('Library');
+        return;
+      }
+
+      // No local model — full download flow.
+      setInitialRoute('ModelDownload');
+    }
+
+    async function tryInitModel(route: 'Library') {
       try {
         await initModel(MODEL_PATH);
         setModelLoaded(true);
-        setInitialRoute('Library');
+        setInitialRoute(route);
       } catch {
-        // Model file exists but corrupt — go to download screen
         setInitialRoute('ModelDownload');
       }
     }
+
     checkModel();
   }, []);
 

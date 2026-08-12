@@ -55,6 +55,9 @@ yarn-error.log
 # Bundle artifact
 *.jsbundle
 
+# Bundled GGUF model (676 MB — fetched by CI at build time)
+android/app/src/main/assets/models/*.gguf
+
 # Ruby / CocoaPods
 **/Pods/
 /vendor/bundle/
