@@ -23,7 +23,7 @@ interface Props {
 }
 
 const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
-  const webviewRef = useRef<WebView>(null);
+  const webviewRef = useRef<any>(null);
   const html = buildQuillHtml(props.initialContent);
 
   function postCmd(cmd: Record<string, unknown>) {
