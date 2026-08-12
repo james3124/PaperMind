@@ -11,7 +11,7 @@ import { documentRepository } from '@/db/DocumentRepository';
 import { importDocx } from '@/services/docxImport';
 import DocumentCard from '@/components/library/DocumentCard';
 import DocumentPicker from 'react-native-document-picker';
-import { Q } from '@nozbe/watermelondb';
+
 
 function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
@@ -205,7 +205,7 @@ export default function LibraryScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container:         { flex: 1, backgroundColor: '#fafafa' },
+  container:         { flex: 1, backgroundColor: '#fafafa', zIndex: 0 },
   header:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   appName:           { fontSize: 22, fontWeight: '800', color: '#6366f1' },
   headerActions:     { flexDirection: 'row', alignItems: 'center', gap: 8 },

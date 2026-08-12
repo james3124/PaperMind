@@ -74,12 +74,12 @@ export default function EditorScreen({ route, navigation }: Props) {
     setReplaceCount(count);
   }, []);
 
-  function handleOutline() {
+  const handleOutline = useCallback(() => {
     editorRef.current?.getHeadings();
     setShowOutline((v) => !v);
-  }
+  }, []);
 
-  async function handleAiAction(prompt: string, text: string) {
+  const handleAiAction = useCallback(async (prompt: string, text: string) => {
     if (!isModelLoaded()) {
       Alert.alert('Model Not Ready', 'The AI model is still loading. Please wait.');
       return;
@@ -100,7 +100,7 @@ export default function EditorScreen({ route, navigation }: Props) {
     } finally {
       setAiLoading(false);
     }
-  }
+  }, []);
 
   const estimatedPages = Math.max(1, Math.ceil(wordCount / 250));
   const readMinutes    = Math.max(1, Math.ceil(wordCount / 200));
@@ -157,6 +157,14 @@ export default function EditorScreen({ route, navigation }: Props) {
             onFormatChange={onFormatChange}
             onHeadings={onHeadings}
             onReplaceResult={onReplaceResult}
+            onSelectionText={(text) => {
+              if (text.trim()) {
+                setSelectedText(text);
+                setShowAi(true);
+              } else {
+                setShowAi(false);
+              }
+            }}
             onReady={() => setEditorReady(true)}
           />
 
