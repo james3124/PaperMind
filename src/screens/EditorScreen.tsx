@@ -13,7 +13,8 @@ import {
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '@/navigation/AppNavigator';
 import {documentRepository} from '@/db/DocumentRepository';
-import {complete, isModelLoaded} from '@/services/llamaService';
+import {complete} from '@/services/llamaService';
+import {modelExists} from '@/utils/modelPaths';
 import {useSettingsStore} from '@/stores/settingsStore';
 import {exportAndShareDocx} from '@/services/exportContent';
 import EditorWebView, {EditorRef} from '@/components/editor/EditorWebView';
@@ -115,13 +116,6 @@ export default function EditorScreen({route, navigation}: Props) {
   }, []);
 
   const handleAiAction = useCallback(async (prompt: string, text: string) => {
-    if (!isModelLoaded()) {
-      Alert.alert(
-        'Model Not Ready',
-        'The AI model is still loading. Please wait.',
-      );
-      return;
-    }
     try {
       const result = await complete(
         [
