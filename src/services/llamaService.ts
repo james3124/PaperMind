@@ -1,13 +1,39 @@
 import { initLlama, LlamaContext } from 'llama.rn';
+import { MODEL_PATH } from '@/utils/modelPaths';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 export interface CompletionMessage {
   role:    'system' | 'user' | 'assistant';
   content: string;
 }
 
+const IDLE_TIMEOUT_MS = 3 * 60 * 1000;
+
 // ── Singleton context ─────────────────────────────────────────────────────────
 
 let _context: LlamaContext | null = null;
+let _idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearIdleTimer(): void {
+  if (_idleTimer) {
+    clearTimeout(_idleTimer);
+    _idleTimer = null;
+  }
+}
+
+function resetIdleTimer(): void {
+  clearIdleTimer();
+  _idleTimer = setTimeout(() => {
+    void releaseModel();
+  }, IDLE_TIMEOUT_MS);
+}
+
+async function ensureModelLoaded(): Promise<void> {
+  if (!_context) {
+    await initModel(MODEL_PATH);
+    useSettingsStore.getState().setModelLoaded(true);
+  }
+}
 
 export function isModelLoaded(): boolean {
   return _context !== null;
@@ -21,13 +47,16 @@ export async function initModel(modelPath: string): Promise<void> {
     n_threads:    4,
     n_gpu_layers: 0,   // CPU only — Android GPU support is unstable
   });
+  resetIdleTimer();
 }
 
 export async function releaseModel(): Promise<void> {
+  clearIdleTimer();
   if (_context) {
     await _context.release();
     _context = null;
   }
+  useSettingsStore.getState().setModelLoaded(false);
 }
 
 // ── Prompt formatting ─────────────────────────────────────────────────────────
@@ -52,10 +81,11 @@ export async function complete(
   temperature:  number = 0.7,
   maxTokens:    number = 1024,
 ): Promise<string> {
-  if (!_context) throw new Error('Model not loaded. Call initModel() first.');
+  await ensureModelLoaded();
+  resetIdleTimer();
 
   const prompt = formatChatML(messages);
-  const result = await _context.completion({
+  const result = await _context!.completion({
     prompt,
     n_predict:   maxTokens,
     temperature,
@@ -71,10 +101,11 @@ export async function stream(
   temperature: number = 0.7,
   maxTokens:   number = 1024,
 ): Promise<void> {
-  if (!_context) throw new Error('Model not loaded. Call initModel() first.');
+  await ensureModelLoaded();
+  resetIdleTimer();
 
   const prompt = formatChatML(messages);
-  await _context.completion(
+  await _context!.completion(
     {
       prompt,
       n_predict:   maxTokens,

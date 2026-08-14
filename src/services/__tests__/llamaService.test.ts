@@ -1,3 +1,9 @@
+jest.mock('react-native-fs', () => ({
+  DocumentDirectoryPath: '/data/user/0/com.papermind/files',
+  exists: jest.fn().mockResolvedValue(false),
+  mkdir:  jest.fn().mockResolvedValue(undefined),
+}));
+
 // Mock llama.rn — we test prompt formatting and service shape only
 jest.mock('llama.rn', () => ({
   initLlama: jest.fn().mockResolvedValue({
@@ -70,5 +76,71 @@ describe('llamaService exports', () => {
   it('exports releaseModel function', () => {
     const { releaseModel } = require('../llamaService');
     expect(typeof releaseModel).toBe('function');
+  });
+});
+
+describe('idle timer', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('initModel arms a 3-minute timer that releases the context', async () => {
+    const { initModel, releaseModel, isModelLoaded } = require('../llamaService');
+    await initModel('/mock/model.gguf');
+    expect(isModelLoaded()).toBe(true);
+    jest.advanceTimersByTime(3 * 60 * 1000);
+    await Promise.resolve();
+    expect(isModelLoaded()).toBe(false);
+  });
+
+  it('complete() resets the idle timer', async () => {
+    const { initModel, isModelLoaded, complete } = require('../llamaService');
+    await initModel('/mock/model.gguf');
+    jest.advanceTimersByTime(2 * 60 * 1000);
+    await complete([{ role: 'user', content: 'hi' }]);
+    // 2 min elapsed + a fresh inference — still loaded after another 2 min
+    jest.advanceTimersByTime(2 * 60 * 1000);
+    await Promise.resolve();
+    expect(isModelLoaded()).toBe(true);
+    // crossing 3 min from the reset releases
+    jest.advanceTimersByTime(60 * 1000);
+    await Promise.resolve();
+    expect(isModelLoaded()).toBe(false);
+  });
+
+  it('releases the model when idle expires and modelLoaded is set false', async () => {
+    const { initModel } = require('../llamaService');
+    const { useSettingsStore } = require('@/stores/settingsStore');
+    useSettingsStore.setState({ modelLoaded: true });
+    await initModel('/mock/model.gguf');
+    jest.advanceTimersByTime(3 * 60 * 1000);
+    await Promise.resolve();
+    expect(useSettingsStore.getState().modelLoaded).toBe(false);
+  });
+
+  it('complete() auto-reloads the model after idle release', async () => {
+    const { initModel, complete, isModelLoaded } = require('../llamaService');
+    const { initLlama } = require('llama.rn');
+    (initLlama as jest.Mock).mockClear();
+    await initModel('/mock/model.gguf');
+    jest.advanceTimersByTime(3 * 60 * 1000);
+    await Promise.resolve();
+    expect(isModelLoaded()).toBe(false);
+    const result = await complete([{ role: 'user', content: 'hi' }]);
+    expect(result).toBe('Mock response');
+    expect(isModelLoaded()).toBe(true);
+    expect(initLlama).toHaveBeenCalled();
+  });
+
+  it('releaseModel() clears the pending idle timer', async () => {
+    const { initModel, releaseModel, isModelLoaded } = require('../llamaService');
+    await initModel('/mock/model.gguf');
+    await releaseModel();
+    jest.advanceTimersByTime(3 * 60 * 1000);
+    await Promise.resolve();
+    expect(isModelLoaded()).toBe(false);
   });
 });
