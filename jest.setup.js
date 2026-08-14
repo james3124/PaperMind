@@ -18,3 +18,11 @@ jest.mock('@react-native-async-storage/async-storage', () => {
     },
   };
 });
+
+// Mock react-native-vector-icons so components render in Node tests.
+jest.mock('react-native-vector-icons/Ionicons', () => {
+  const React = require('react');
+  const {Text} = require('react-native');
+  const MockIcon = (props: any) => React.createElement(Text, props, 'icon');
+  return MockIcon;
+});

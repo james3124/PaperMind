@@ -30,7 +30,10 @@ function buildDocumentXml(title: string, content: string): string {
     </w:pPr>
     <w:r>
       <w:rPr><w:b/><w:sz w:val="32"/></w:rPr>
-      <w:t>${title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</w:t>
+      <w:t>${title
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')}</w:t>
     </w:r>
   </w:p>`;
 
@@ -73,29 +76,41 @@ const WORD_RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export async function exportDocx(title: string, content: string): Promise<string> {
+export async function exportDocx(
+  title: string,
+  content: string,
+): Promise<string> {
   const zip = new JSZip();
 
   zip.file('[Content_Types].xml', CONTENT_TYPES_XML);
-  zip.file('_rels/.rels',         RELS_XML);
+  zip.file('_rels/.rels', RELS_XML);
   zip.file('word/_rels/document.xml.rels', WORD_RELS_XML);
-  zip.file('word/document.xml',   buildDocumentXml(title, content));
+  zip.file('word/document.xml', buildDocumentXml(title, content));
 
-  const base64 = await zip.generateAsync({ type: 'base64' });
+  const base64 = await zip.generateAsync({type: 'base64'});
 
-  // Write to Downloads
-  const safeTitle = title.replace(/[^a-zA-Z0-9\s-]/g, '').trim().replace(/\s+/g, '_');
-  const fileName  = `${safeTitle || 'paper'}.docx`;
-  const outPath   = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+  // Write to app-private cache (works on Android 10+ scoped storage without
+  // extra permissions), then hand the file:// URL to the system share sheet.
+  const safeTitle = title
+    .replace(/[^a-zA-Z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '_');
+  const fileName = `${safeTitle || 'paper'}.docx`;
+  const outPath = `${RNFS.CachesDirectoryPath}/export/${fileName}`;
 
+  await RNFS.mkdir(`${RNFS.CachesDirectoryPath}/export`);
   await RNFS.writeFile(outPath, base64, 'base64');
 
-  // Share
+  return outPath;
+}
+
+export async function shareDocx(
+  outPath: string,
+  fileName: string,
+): Promise<void> {
   await Share.open({
-    url:   `file://${outPath}`,
-    type:  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    url: `file://${outPath}`,
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     title: `Share ${fileName}`,
   });
-
-  return outPath;
 }

@@ -1,46 +1,77 @@
-import React, { forwardRef, useImperativeHandle, useRef } from 'react';
-import { StyleSheet } from 'react-native';
-import WebView, { WebViewMessageEvent } from 'react-native-webview';
-import { buildQuillHtml } from './quillHtml';
+import React, {forwardRef, useImperativeHandle, useRef} from 'react';
+import {StyleSheet, Platform} from 'react-native';
+import WebView, {WebViewMessageEvent} from 'react-native-webview';
+import {buildQuillHtml} from './quillHtml';
+import type {PaperSize} from '@/stores/settingsStore';
 
 export interface EditorRef {
-  format:      (key: string, value: unknown) => void;
-  insertText:  (text: string) => void;
+  format: (key: string, value: unknown) => void;
+  insertText: (text: string) => void;
+  insertImage: (dataUrl: string) => void;
+  insertTable: (rows: number, cols: number) => void;
+  insertPageBreak: () => void;
+  addTableRow: () => void;
+  addTableColumn: () => void;
+  deleteTableRow: () => void;
+  deleteTableColumn: () => void;
+  deleteTable: () => void;
   findReplace: (find: string, replace: string) => void;
   getHeadings: () => void;
-  scrollTo:    (index: number) => void;
-  undo:        () => void;
-  redo:        () => void;
+  scrollTo: (index: number) => void;
+  undo: () => void;
+  redo: () => void;
+  setPaperSize: (paperSize: PaperSize) => void;
+  getContent: (onContent: (delta: string) => void) => void;
 }
 
 interface Props {
-  initialContent:  string;
+  initialContent: string;
+  paperSize: PaperSize;
   onContentChange: (delta: string, wordCount: number) => void;
-  onFormatChange:  (format: Record<string, unknown>) => void;
-  onHeadings:      (headings: { level: number; text: string; index: number }[]) => void;
-  onReplaceResult:   (count: number) => void;
-  onSelectionText?:  (text: string) => void;
-  onReady:           () => void;
+  onFormatChange: (format: Record<string, unknown>) => void;
+  onHeadings: (
+    headings: {level: number; text: string; index: number}[],
+  ) => void;
+  onReplaceResult: (count: number) => void;
+  onSelectionText?: (text: string) => void;
+  onReady: () => void;
 }
 
 const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
   const webviewRef = useRef<any>(null);
-  const html = buildQuillHtml(props.initialContent);
+  const html = buildQuillHtml(props.initialContent, props.paperSize);
+  const pendingGetContent = useRef<((delta: string) => void) | null>(null);
 
   function postCmd(cmd: Record<string, unknown>) {
     webviewRef.current?.injectJavaScript(
-      `(function(){ handleMessage({ data: ${JSON.stringify(JSON.stringify(cmd))} }); })(); true;`
+      `(function(){ handleMessage({ data: ${JSON.stringify(
+        JSON.stringify(cmd),
+      )} }); })(); true;`,
     );
   }
 
   useImperativeHandle(ref, () => ({
-    format:      (key, value) => postCmd({ cmd: 'format', key, value }),
-    insertText:  (text)       => postCmd({ cmd: 'insertText', text }),
-    findReplace: (find, replace) => postCmd({ cmd: 'findReplace', find, replace }),
-    getHeadings: ()           => postCmd({ cmd: 'getHeadings' }),
-    scrollTo:    (index)      => postCmd({ cmd: 'scrollTo', index }),
-    undo:        ()           => postCmd({ cmd: 'undo' }),
-    redo:        ()           => postCmd({ cmd: 'redo' }),
+    format: (key, value) => postCmd({cmd: 'format', key, value}),
+    insertText: text => postCmd({cmd: 'insertText', text}),
+    insertImage: dataUrl => postCmd({cmd: 'insertImage', dataUrl}),
+    insertTable: (rows, cols) => postCmd({cmd: 'insertTable', rows, cols}),
+    insertPageBreak: () => postCmd({cmd: 'insertPageBreak'}),
+    addTableRow: () => postCmd({cmd: 'addTableRow'}),
+    addTableColumn: () => postCmd({cmd: 'addTableColumn'}),
+    deleteTableRow: () => postCmd({cmd: 'deleteTableRow'}),
+    deleteTableColumn: () => postCmd({cmd: 'deleteTableColumn'}),
+    deleteTable: () => postCmd({cmd: 'deleteTable'}),
+    findReplace: (find, replace) =>
+      postCmd({cmd: 'findReplace', find, replace}),
+    getHeadings: () => postCmd({cmd: 'getHeadings'}),
+    scrollTo: index => postCmd({cmd: 'scrollTo', index}),
+    undo: () => postCmd({cmd: 'undo'}),
+    redo: () => postCmd({cmd: 'redo'}),
+    setPaperSize: paperSize => postCmd({cmd: 'setPaperSize', paperSize}),
+    getContent: onContent => {
+      pendingGetContent.current = onContent;
+      postCmd({cmd: 'getContent'});
+    },
   }));
 
   function onMessage(event: WebViewMessageEvent) {
@@ -62,6 +93,10 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
         case 'selection-text':
           props.onSelectionText?.(msg.text ?? '');
           break;
+        case 'content':
+          pendingGetContent.current?.(msg.delta ?? '');
+          pendingGetContent.current = null;
+          break;
         case 'ready':
           props.onReady();
           break;
@@ -72,17 +107,22 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
   return (
     <WebView
       ref={webviewRef}
-      source={{ html }}
+      source={{html}}
       style={styles.webview}
       originWhitelist={['*']}
       onMessage={onMessage}
       keyboardDisplayRequiresUserAction={false}
-      scalesPageToFit={false}
+      scalesPageToFit={Platform.OS === 'ios'}
       scrollEnabled={true}
       allowsInlineMediaPlayback
       javaScriptEnabled
       domStorageEnabled
       mixedContentMode="always"
+      textZoom={100}
+      setBuiltInZoomControls={true}
+      setDisplayZoomControls={false}
+      minimumZoomScale={0.5}
+      maximumZoomScale={2.5}
     />
   );
 });
@@ -92,5 +132,5 @@ EditorWebView.displayName = 'EditorWebView';
 export default EditorWebView;
 
 const styles = StyleSheet.create({
-  webview: { flex: 1, backgroundColor: '#fff' },
+  webview: {flex: 1, backgroundColor: '#fff'},
 });
