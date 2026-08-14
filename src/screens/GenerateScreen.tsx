@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform,
@@ -6,6 +6,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useSettingsStore } from '@/stores/settingsStore';
+import {modelExists} from '@/utils/modelPaths';
 import CitationSheet, { CitationChoice } from '@/components/generate/CitationSheet';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Generate'>;
@@ -42,14 +43,26 @@ export default function GenerateScreen({ navigation }: Props) {
   const [academicLevel, setLevel]        = useState<AcademicLevel>('shs');
   const [paperLength,   setLength]       = useState<PaperLength>('standard');
   const [showCitation,  setShowCitation] = useState(false);
+  const [modelMissing, setModelMissing] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const exists = await modelExists();
+      if (!cancelled) setModelMissing(!exists);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [citation,      setCitation]     = useState<CitationChoice>({
     style:   settings.defaultCitationStyle,
     edition: settings.defaultCitationEdition,
   });
 
-  function handleGenerate() {
+  async function handleGenerate() {
     if (!topic.trim()) return;
-    if (!settings.modelLoaded) {
+    if (!(await modelExists())) {
       navigation.navigate('ModelDownload');
       return;
     }
@@ -168,7 +181,7 @@ export default function GenerateScreen({ navigation }: Props) {
           <Text style={styles.generateText}>Generate Paper</Text>
         </TouchableOpacity>
 
-        {!settings.modelLoaded && (
+        {modelMissing && (
           <Text style={styles.noKeyWarning}>
             ⚠️ AI model not loaded — tap "Generate Paper" to download it first.
           </Text>
