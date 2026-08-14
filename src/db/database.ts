@@ -8,7 +8,7 @@ const adapter = new SQLiteAdapter({
   schema,
   migrations,
   dbName: 'papermind',
-  jsi: true,   // Use JSI for better performance on Android
+  jsi: false,  // JSI disabled for SQLite stability on Android
   onSetUpError: (error) => {
     console.error('WatermelonDB setup error:', error);
   },
