@@ -74,6 +74,12 @@ export default function EditorScreen({route, navigation}: Props) {
     });
   }, [documentId]);
 
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, []);
+  
   // Auto-save
   const onContentChange = useCallback(
     (delta: string, wc: number) => {
