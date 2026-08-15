@@ -6,9 +6,6 @@ on:
       - 'v*'
   workflow_dispatch:
 
-permissions:        # ← here, before "jobs:"
-  contents: write
-
 jobs:
   build:
     name: Build release APK
