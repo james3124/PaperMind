@@ -28,6 +28,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
 
 export default function App() {
   const [initialRoute, setInitialRoute] = useState<'Library' | 'ModelDownload' | null>(null);
+  const [loadingMsg, setLoadingMsg] = useState('Starting PaperMind…'); 
 
   useEffect(() => {
     async function checkModel() {
