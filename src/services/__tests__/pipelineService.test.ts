@@ -1,3 +1,10 @@
+// react-native-fs uses NativeEventEmitter at module load, which throws in Node — mock it.
+jest.mock('react-native-fs', () => ({
+  DocumentDirectoryPath: '/data/user/0/com.papermind/files',
+  exists: jest.fn().mockResolvedValue(false),
+  mkdir:  jest.fn().mockResolvedValue(undefined),
+}));
+
 // WatermelonDB's SQLite adapter can't run in Node (JSI) — mock the
 // repository so the pipeline module loads without native DB initialisation.
 jest.mock('@/db/DocumentRepository', () => ({
