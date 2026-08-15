@@ -80,19 +80,21 @@ describe('llamaService exports', () => {
 });
 
 describe('idle timer', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.useFakeTimers();
+    const { releaseModel } = require('../llamaService');
+    await releaseModel();
   });
   afterEach(() => {
     jest.useRealTimers();
   });
 
   it('initModel arms a 3-minute timer that releases the context', async () => {
-    const { initModel, releaseModel, isModelLoaded } = require('../llamaService');
+    const { initModel, isModelLoaded } = require('../llamaService');
     await initModel('/mock/model.gguf');
     expect(isModelLoaded()).toBe(true);
     jest.advanceTimersByTime(3 * 60 * 1000);
-    await Promise.resolve();
+    await jest.runAllTicks();
     expect(isModelLoaded()).toBe(false);
   });
 
@@ -103,11 +105,11 @@ describe('idle timer', () => {
     await complete([{ role: 'user', content: 'hi' }]);
     // 2 min elapsed + a fresh inference — still loaded after another 2 min
     jest.advanceTimersByTime(2 * 60 * 1000);
-    await Promise.resolve();
+    await jest.runAllTicks();
     expect(isModelLoaded()).toBe(true);
     // crossing 3 min from the reset releases
     jest.advanceTimersByTime(60 * 1000);
-    await Promise.resolve();
+    await jest.runAllTicks();
     expect(isModelLoaded()).toBe(false);
   });
 
@@ -117,7 +119,7 @@ describe('idle timer', () => {
     useSettingsStore.setState({ modelLoaded: true });
     await initModel('/mock/model.gguf');
     jest.advanceTimersByTime(3 * 60 * 1000);
-    await Promise.resolve();
+    await jest.runAllTicks();
     expect(useSettingsStore.getState().modelLoaded).toBe(false);
   });
 
@@ -127,7 +129,7 @@ describe('idle timer', () => {
     (initLlama as jest.Mock).mockClear();
     await initModel('/mock/model.gguf');
     jest.advanceTimersByTime(3 * 60 * 1000);
-    await Promise.resolve();
+    await jest.runAllTicks();
     expect(isModelLoaded()).toBe(false);
     const result = await complete([{ role: 'user', content: 'hi' }]);
     expect(result).toBe('Mock response');
@@ -140,7 +142,7 @@ describe('idle timer', () => {
     await initModel('/mock/model.gguf');
     await releaseModel();
     jest.advanceTimersByTime(3 * 60 * 1000);
-    await Promise.resolve();
+    await jest.runAllTicks();
     expect(isModelLoaded()).toBe(false);
   });
 });

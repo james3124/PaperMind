@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -45,16 +46,18 @@ export default function GenerateScreen({ navigation }: Props) {
   const [showCitation,  setShowCitation] = useState(false);
   const [modelMissing, setModelMissing] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const exists = await modelExists();
-      if (!cancelled) setModelMissing(!exists);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const exists = await modelExists();
+        if (!cancelled) setModelMissing(!exists);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
   const [citation,      setCitation]     = useState<CitationChoice>({
     style:   settings.defaultCitationStyle,
     edition: settings.defaultCitationEdition,

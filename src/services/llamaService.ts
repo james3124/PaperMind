@@ -13,6 +13,7 @@ const IDLE_TIMEOUT_MS = 3 * 60 * 1000;
 
 let _context: LlamaContext | null = null;
 let _idleTimer: ReturnType<typeof setTimeout> | null = null;
+let _loadingPromise: Promise<void> | null = null;
 
 function clearIdleTimer(): void {
   if (_idleTimer) {
@@ -31,7 +32,6 @@ function resetIdleTimer(): void {
 async function ensureModelLoaded(): Promise<void> {
   if (!_context) {
     await initModel(MODEL_PATH);
-    useSettingsStore.getState().setModelLoaded(true);
   }
 }
 
@@ -41,13 +41,23 @@ export function isModelLoaded(): boolean {
 
 export async function initModel(modelPath: string): Promise<void> {
   if (_context) return; // Already loaded
-  _context = await initLlama({
-    model:        modelPath,
-    n_ctx:        2048,
-    n_threads:    4,
-    n_gpu_layers: 0,   // CPU only — Android GPU support is unstable
+  if (_loadingPromise) {
+    await _loadingPromise;
+    return;
+  }
+  _loadingPromise = (async () => {
+    _context = await initLlama({
+      model:        modelPath,
+      n_ctx:        2048,
+      n_threads:    4,
+      n_gpu_layers: 0,   // CPU only — Android GPU support is unstable
+    });
+    resetIdleTimer();
+    useSettingsStore.getState().setModelLoaded(true);
+  })().finally(() => {
+    _loadingPromise = null;
   });
-  resetIdleTimer();
+  await _loadingPromise;
 }
 
 export async function releaseModel(): Promise<void> {
@@ -76,23 +86,28 @@ export function formatChatML(messages: CompletionMessage[]): string {
 
 // ── Inference ─────────────────────────────────────────────────────────────────
 
+const TOKEN_REARM_THROTTLE_MS = 1000;
+let _lastTokenRearm = 0;
+
 export async function complete(
   messages:     CompletionMessage[],
   temperature:  number = 0.7,
   maxTokens:    number = 1024,
 ): Promise<string> {
   await ensureModelLoaded();
-  resetIdleTimer();
-
-  const prompt = formatChatML(messages);
-  const result = await _context!.completion({
-    prompt,
-    n_predict:   maxTokens,
-    temperature,
-    stop:        ['<|im_end|>', '<|im_start|>'],
-  });
-
-  return result.text.trim();
+  clearIdleTimer();
+  try {
+    const prompt = formatChatML(messages);
+    const result = await _context!.completion({
+      prompt,
+      n_predict:   maxTokens,
+      temperature,
+      stop:        ['<|im_end|>', '<|im_start|>'],
+    });
+    return result.text.trim();
+  } finally {
+    resetIdleTimer();
+  }
 }
 
 export async function stream(
@@ -102,18 +117,29 @@ export async function stream(
   maxTokens:   number = 1024,
 ): Promise<void> {
   await ensureModelLoaded();
-  resetIdleTimer();
-
-  const prompt = formatChatML(messages);
-  await _context!.completion(
-    {
-      prompt,
-      n_predict:   maxTokens,
-      temperature,
-      stop:        ['<|im_end|>', '<|im_start|>'],
-    },
-    (data) => {
-      if (data.token) onToken(data.token);
-    }
-  );
+  clearIdleTimer();
+  _lastTokenRearm = 0;
+  try {
+    const prompt = formatChatML(messages);
+    await _context!.completion(
+      {
+        prompt,
+        n_predict:   maxTokens,
+        temperature,
+        stop:        ['<|im_end|>', '<|im_start|>'],
+      },
+      (data) => {
+        if (data.token) {
+          const now = Date.now();
+          if (now - _lastTokenRearm > TOKEN_REARM_THROTTLE_MS) {
+            _lastTokenRearm = now;
+            resetIdleTimer();
+          }
+          onToken(data.token);
+        }
+      }
+    );
+  } finally {
+    resetIdleTimer();
+  }
 }

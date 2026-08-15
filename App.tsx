@@ -7,11 +7,9 @@ import AppNavigator    from '@/navigation/AppNavigator';
 import { modelExists, bundledModelExists, copyBundledModel } from '@/utils/modelPaths';
 import { initModel }   from '@/services/llamaService';
 import { MODEL_PATH }  from '@/utils/modelPaths';
-import { useSettingsStore } from '@/stores/settingsStore';
 
 export default function App() {
   const [initialRoute, setInitialRoute] = useState<'Library' | 'ModelDownload' | null>(null);
-  const setModelLoaded = useSettingsStore((s) => s.setModelLoaded);
 
   useEffect(() => {
     async function checkModel() {
@@ -36,7 +34,6 @@ export default function App() {
     async function tryInitModel(route: 'Library') {
       try {
         await initModel(MODEL_PATH);
-        setModelLoaded(true);
         setInitialRoute(route);
       } catch {
         setInitialRoute('ModelDownload');

@@ -18,7 +18,6 @@ export default function SettingsScreen({ navigation }: Props) {
     try {
       await releaseModel();
       await initModel(MODEL_PATH);
-      store.setModelLoaded(true);
       Alert.alert('Model Reloaded', 'The AI model has been reloaded successfully.');
     } catch (e: unknown) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to reload model');

@@ -7,7 +7,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { MODEL_URL, MODEL_PATH, ensureModelDir } from '@/utils/modelPaths';
 import { initModel } from '@/services/llamaService';
-import { useSettingsStore } from '@/stores/settingsStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ModelDownload'>;
 
@@ -17,8 +16,6 @@ function formatBytes(bytes: number): string {
 }
 
 export default function ModelDownloadScreen({ navigation }: Props) {
-  const setModelLoaded = useSettingsStore((s) => s.setModelLoaded);
-
   const [status,      setStatus]      = useState<'idle' | 'downloading' | 'loading' | 'done' | 'error'>('idle');
   const [progress,    setProgress]    = useState(0);        // 0–1
   const [downloaded,  setDownloaded]  = useState(0);
@@ -61,7 +58,6 @@ export default function ModelDownloadScreen({ navigation }: Props) {
       // Load model
       setStatus('loading');
       await initModel(MODEL_PATH);
-      setModelLoaded(true);
       setStatus('done');
 
       navigation.replace('Library');
