@@ -71,54 +71,7 @@ PaperMind turns a single research topic into a complete, citation-ready academic
 | DOCX in/out | jszip + react-native-fs (fully on-device) |
 | CI / APK build | GitHub Actions + Gradle |
 
-## 🏗️ Development
-
-### Prerequisites
-
-- Node 18+, Java 17, Android SDK 35
-- Complete the [React Native environment setup](https://reactnative.dev/docs/environment-setup)
-
-### Run it
-
-```bash
-npm install
-
-# Start Metro
-npm start
-
-# Run on Android
-npm run android
 ```
-
-### Test & lint
-
-```bash
-npm test
-npm run lint
-```
-
-### Build the APK locally
-
-```bash
-cd android && ./gradlew assembleDebug
-# Output: android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-> Pushing a `v*` tag triggers [GitHub Actions](.github/workflows/build_apk.yml), which builds the APK and attaches it to a new [Release](https://github.com/james3124/PaperMind/releases).
-
-## 📁 Project Structure
-
-```
-src/
-├── db/          # WatermelonDB setup, models, migrations
-├── stores/      # Zustand stores (settings)
-├── services/    # llamaService, pipelineService, literatureSearch, docxImport/Export
-├── screens/     # Library, Generate, Progress, Editor, Model Download, Settings
-├── components/  # editor/, library/, generate/ subcomponents
-├── navigation/  # AppNavigator
-└── utils/       # model paths, provider config
-```
-
 ## 📄 License
 
 Private project — all rights reserved.
