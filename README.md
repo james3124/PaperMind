@@ -70,7 +70,3 @@ PaperMind turns a single research topic into a complete, citation-ready academic
 | DOCX in/out | jszip + react-native-fs (fully on-device) |
 | CI / APK build | GitHub Actions + Gradle |
 
-```
-## 📄 License
-
-Private project — all rights reserved.
