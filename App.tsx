@@ -58,7 +58,7 @@ export default function App() {
       }
     }
 
-    checkModel();
+    checkModel().catch(() => setInitialRoute('ModelDownload'));
   }, []);
 
   if (!initialRoute) {
