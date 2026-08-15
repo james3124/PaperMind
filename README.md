@@ -55,7 +55,6 @@ PaperMind turns a single research topic into a complete, citation-ready academic
 1. Open the [latest release](https://github.com/james3124/PaperMind/releases/latest)
 2. Download `app-debug.apk`
 3. Open the file on your Android device and allow installation from unknown sources
-4. Launch **PaperMind** — on first run it downloads the on-device AI model (~676 MB), then you're ready to generate
 
 ## 🛠️ Tech Stack
 
