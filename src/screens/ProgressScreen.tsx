@@ -5,7 +5,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { runPipeline, STAGE_LABELS, PipelineConfig } from '@/services/pipelineService';
-import { isModelLoaded } from '@/services/llamaService';
+import {modelExists} from '@/utils/modelPaths';
 import StageList from '@/components/generate/StageList';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Progress'>;
@@ -39,7 +39,7 @@ export default function ProgressScreen({ route, navigation }: Props) {
     let cancelled = false;
 
     async function run() {
-      if (!isModelLoaded()) {
+      if (!(await modelExists())) {
         setFatalError('AI model is not loaded. Please restart the app.');
         return;
       }
