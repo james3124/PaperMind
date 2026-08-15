@@ -1,4 +1,4 @@
-import { MODEL_PATH } from '../../utils/modelPaths';
+import { getModelPath } from '../../utils/modelPaths';
 
 // Mock RNFS
 jest.mock('react-native-fs', () => ({
@@ -34,7 +34,7 @@ describe('settingsStore defaults', () => {
 });
 
 describe('modelPaths', () => {
-  it('MODEL_PATH includes model filename', () => {
-    expect(MODEL_PATH).toContain('qwen2.5-0.5b-instruct-q8_0.gguf');
+  it('getModelPath includes model filename', () => {
+    expect(getModelPath()).toContain('qwen2.5-0.5b-instruct-q8_0.gguf');
   });
 });

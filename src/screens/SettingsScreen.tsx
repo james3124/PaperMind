@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { releaseModel, initModel } from '@/services/llamaService';
-import { MODEL_PATH } from '@/utils/modelPaths';
+import { getModelPath } from '@/utils/modelPaths';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 
@@ -17,7 +17,7 @@ export default function SettingsScreen({ navigation }: Props) {
   async function handleReloadModel() {
     try {
       await releaseModel();
-      await initModel(MODEL_PATH);
+      await initModel(getModelPath());
       Alert.alert('Model Reloaded', 'The AI model has been reloaded successfully.');
     } catch (e: unknown) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to reload model');
@@ -54,7 +54,7 @@ export default function SettingsScreen({ navigation }: Props) {
             <Text style={styles.statusText}>{modelLoaded ? '✓ Ready' : '✗ Not loaded'}</Text>
           </View>
         </View>
-        <Text style={styles.modelPath} numberOfLines={1}>{MODEL_PATH}</Text>
+        <Text style={styles.modelPath} numberOfLines={1}>{getModelPath()}</Text>
       </View>
 
       {modelLoaded && (

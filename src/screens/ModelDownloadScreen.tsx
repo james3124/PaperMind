@@ -5,7 +5,7 @@ import {
 import RNFS from 'react-native-fs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
-import { MODEL_URL, MODEL_PATH, ensureModelDir } from '@/utils/modelPaths';
+import { MODEL_URL, getModelPath, ensureModelDir } from '@/utils/modelPaths';
 import { initModel } from '@/services/llamaService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ModelDownload'>;
@@ -32,12 +32,12 @@ export default function ModelDownloadScreen({ navigation }: Props) {
       await ensureModelDir();
 
       // Delete partial file if exists
-      const exists = await RNFS.exists(MODEL_PATH);
-      if (exists) await RNFS.unlink(MODEL_PATH);
+      const exists = await RNFS.exists(getModelPath());
+      if (exists) await RNFS.unlink(getModelPath());
 
       const job = RNFS.downloadFile({
         fromUrl:         MODEL_URL,
-        toFile:          MODEL_PATH,
+        toFile:          getModelPath(),
         background:      false,
         discretionary:   false,
         progress: (res) => {
@@ -57,7 +57,7 @@ export default function ModelDownloadScreen({ navigation }: Props) {
 
       // Load model
       setStatus('loading');
-      await initModel(MODEL_PATH);
+      await initModel(getModelPath());
       setStatus('done');
 
       navigation.replace('Library');

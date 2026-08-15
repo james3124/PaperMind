@@ -1,5 +1,5 @@
 import { initLlama, LlamaContext } from 'llama.rn';
-import { MODEL_PATH } from '@/utils/modelPaths';
+import { getModelPath } from '@/utils/modelPaths';
 import { useSettingsStore } from '@/stores/settingsStore';
 
 export interface CompletionMessage {
@@ -31,7 +31,7 @@ function resetIdleTimer(): void {
 
 async function ensureModelLoaded(): Promise<void> {
   if (!_context) {
-    await initModel(MODEL_PATH);
+    await initModel(getModelPath());
   }
 }
 

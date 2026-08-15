@@ -1,7 +1,7 @@
 import {create} from 'zustand';
 import {persist, createJSONStorage} from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {MODEL_PATH} from '@/utils/modelPaths';
+import {getModelPath} from '@/utils/modelPaths';
 
 export type PaperSize = 'a4' | 'letter' | 'a5' | 'a3';
 
@@ -24,7 +24,7 @@ export interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     set => ({
-      modelPath: MODEL_PATH,
+      modelPath: getModelPath(),
       modelLoaded: false,
       defaultCitationStyle: 'apa',
       defaultCitationEdition: '7th',
