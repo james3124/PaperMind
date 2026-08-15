@@ -41,7 +41,9 @@ export default function App() {
       // Not in storage yet. If a model is bundled in the APK assets, copy it
       // into storage once, then load. No download screen needed.
       if (await bundledModelExists()) {
+        setLoadingMsg('Preparing model (first launch, one-time)…');
         await copyBundledModel();
+        setLoadingMsg('Loading AI model into memory…'); 
         await tryInitModel('Library');
         return;
       }
@@ -66,7 +68,7 @@ export default function App() {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color="#6366f1" />
-        <Text style={styles.loadingText}>Starting PaperMind…</Text>
+        <Text style={styles.loadingText}>{loadingMsg}</Text>
       </View>
     );
   }
