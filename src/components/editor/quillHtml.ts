@@ -11,7 +11,6 @@ export function buildQuillHtml(
   initialContent: string,
   paperSize: PaperSizeKey = 'a4',
 ): string {
-  // Escape content for injection into JS string
   const escaped = initialContent
     .replace(/\\/g, '\\\\')
     .replace(/`/g, '\\`')
@@ -34,7 +33,7 @@ export function buildQuillHtml(
     .ql-editor h2 { font-size: 18px; margin-bottom: 10px; }
     .ql-editor h3 { font-size: 15px; margin-bottom: 8px; }
     .ql-editor p  { margin-bottom: 8px; }
-    .ql-toolbar  { display: none; }    /* We use our own RN toolbar */
+    .ql-toolbar  { display: none; }
     /* PaperMind custom table */
     table.ql-paper-table { border-collapse: collapse; width: 100%; margin: 12px 0; }
     table.ql-paper-table td {
@@ -44,7 +43,7 @@ export function buildQuillHtml(
     table.ql-paper-table td[contenteditable="true"]:focus { outline: 2px solid #6366f1; outline-offset: -2px; }
     /* PaperMind page break */
     hr.ql-page-break { border: none; border-top: 2px dashed #9ca3af; margin: 20px 0; page-break-after: always; break-after: page; }
-    /* PaperMind horizontal rule (Word-style) */
+    /* PaperMind horizontal rule */
     hr.ql-paper-hr { border: none; border-top: 1px solid #374151; margin: 16px 0; }
   </style>
 </head>
@@ -53,12 +52,10 @@ export function buildQuillHtml(
     <div id="editor"></div>
   </div>
   <script>
-    // ── Custom blots & formats (Quill official API) ─────────────────────────
+    // ── Custom blots & formats ──────────────────────────────────────────────
     const BlockEmbed = Quill.import('blots/block/embed');
     const BlockStyle = Quill.import('attributors/style/block');
 
-    // Table: stored as HTML so it round-trips through the delta, cells are
-    // contenteditable so typing works; row/col edits read the live DOM.
     class PaperTableBlot extends BlockEmbed {
       static create(value) {
         const node = super.create(value);
@@ -88,25 +85,21 @@ export function buildQuillHtml(
       return html + '</tbody>';
     }
 
-    // Page break: a block embed rendered as a dashed rule that forces a
-    // page break when printing / exporting to PDF.
     class PageBreakBlot extends BlockEmbed {
-      static create(value) {
-        const node = super.create(value);
-        return node;
-      }
+      static create(value) { return super.create(value); }
       static value() { return true; }
     }
     PageBreakBlot.blotName = 'page-break';
     PageBreakBlot.tagName = 'hr';
     PageBreakBlot.className = 'ql-page-break';
 
-    // Line spacing: block-level attributor mapped to CSS line-height.
     const SpacingAttributor = new BlockStyle('spacing', 'line-height');
 
     Quill.register(PaperTableBlot, true);
     Quill.register(PageBreakBlot, true);
     Quill.register(SpacingAttributor, true);
+
+    const Delta = Quill.import('delta');
 
     const quill = new Quill('#editor', {
       theme: 'snow',
@@ -121,7 +114,7 @@ export function buildQuillHtml(
       document.getElementById('editor').style.maxWidth = Math.round(base * ratio) + 'px';
     }
 
-    // Load initial content
+    // Load initial content — supports Delta JSON or plain text
     const initialText = \`${escaped}\`;
     if (initialText.startsWith('{') && initialText.includes('"ops"')) {
       try {
@@ -135,7 +128,7 @@ export function buildQuillHtml(
 
     applyPaperSize('${paperSize}');
 
-    // ── Content change → React Native (auto-save) ───────────────────────────
+    // ── Content change → React Native ───────────────────────────────────────
     function postContentChange() {
       clearTimeout(saveTimer);
       const delta = JSON.stringify(quill.getContents());
@@ -151,14 +144,11 @@ export function buildQuillHtml(
     }
     let saveTimer = null;
     quill.on('text-change', postContentChange);
-    // Typing inside table cells doesn't fire Quill text-change, so watch input.
     document.getElementById('editor').addEventListener('input', (e) => {
       const table = e.target.closest('table.ql-paper-table');
       if (table) postContentChange();
     });
 
-    // Post format at cursor to sync toolbar state
-    // Also post selected text so RN can open the AI panel
     quill.on('selection-change', (range) => {
       if (!range) return;
       postFormat(range.index);
@@ -170,7 +160,6 @@ export function buildQuillHtml(
           }));
         }
       } else {
-        // Deselect — close AI panel
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'selection-text', text: '',
         }));
@@ -215,8 +204,7 @@ export function buildQuillHtml(
     function addTableColumn() {
       const table = getTableAtSelection();
       if (!table) return;
-      const rows = Array.prototype.slice.call(table.querySelectorAll('tr'));
-      rows.forEach((tr) => {
+      Array.prototype.slice.call(table.querySelectorAll('tr')).forEach((tr) => {
         const td = document.createElement('td');
         td.setAttribute('contenteditable', 'true');
         td.innerHTML = '<br>';
@@ -229,9 +217,7 @@ export function buildQuillHtml(
       const table = getTableAtSelection();
       if (!table) return;
       const tr = document.querySelector('.ql-editor .ql-paper-table tr:focus-within');
-      if (tr && tr.parentNode && tr.parentNode.tagName === 'TBODY') {
-        tr.parentNode.removeChild(tr);
-      }
+      if (tr && tr.parentNode && tr.parentNode.tagName === 'TBODY') tr.parentNode.removeChild(tr);
       postContentChange();
     }
 
@@ -241,8 +227,7 @@ export function buildQuillHtml(
       const td = document.querySelector('.ql-editor .ql-paper-table td:focus-within');
       if (!td) return;
       const idx = td.cellIndex;
-      const rows = Array.prototype.slice.call(table.querySelectorAll('tr'));
-      rows.forEach((tr) => {
+      Array.prototype.slice.call(table.querySelectorAll('tr')).forEach((tr) => {
         if (tr.cells[idx]) tr.removeChild(tr.cells[idx]);
       });
       postContentChange();
@@ -252,23 +237,17 @@ export function buildQuillHtml(
       const table = getTableAtSelection();
       if (!table) return;
       const range = quill.getSelection();
-      if (range) {
-        quill.deleteText(range.index, 1);
-      } else {
-        table.parentNode && table.parentNode.removeChild(table);
-      }
+      if (range) { quill.deleteText(range.index, 1); }
+      else if (table.parentNode) { table.parentNode.removeChild(table); }
       postContentChange();
     }
 
-    // ── Command dispatcher from React Native ────────────────────────────────
+    // ── Command dispatcher ───────────────────────────────────────────────────
     document.addEventListener('message', handleMessage);
     window.addEventListener('message', handleMessage);
 
     function handleMessage(event) {
-      try {
-        const msg = JSON.parse(event.data);
-        executeCommand(msg);
-      } catch {}
+      try { executeCommand(JSON.parse(event.data)); } catch {}
     }
 
     function executeCommand(msg) {
@@ -276,49 +255,66 @@ export function buildQuillHtml(
         case 'format':
           quill.format(msg.key, msg.value);
           break;
-        case 'insertText':
+
+        case 'insertText': {
           quill.focus();
           const sel = quill.getSelection(true);
           quill.insertText(sel.index, msg.text);
           break;
-        case 'insertImage':
+        }
+
+        // ── NEW: insert a Quill Delta at the current cursor position ─────────
+        case 'insertDelta': {
+          quill.focus();
+          const sel = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+          if (sel.length > 0) quill.deleteText(sel.index, sel.length, 'user');
+          try {
+            const parsed = JSON.parse(msg.delta);
+            const ops    = Array.isArray(parsed) ? parsed : (parsed.ops || []);
+            const incoming = new Delta(ops);
+            const update   = new Delta().retain(sel.index).concat(incoming);
+            quill.updateContents(update, 'user');
+          } catch {}
+          break;
+        }
+
+        case 'insertImage': {
           quill.focus();
           const imgSel = quill.getSelection(true);
           quill.insertEmbed(imgSel.index, 'image', msg.dataUrl, 'user');
           break;
-        case 'insertTable':
+        }
+
+        case 'insertTable': {
           quill.focus();
           const tblSel = quill.getSelection(true);
           quill.insertEmbed(tblSel.index, 'paper-table', { rows: msg.rows, cols: msg.cols }, 'user');
           break;
-        case 'insertPageBreak':
+        }
+
+        case 'insertPageBreak': {
           quill.focus();
           const pbSel = quill.getSelection(true);
           quill.insertEmbed(pbSel.index, 'page-break', true, 'user');
           break;
-        case 'addTableRow':
-          addTableRow();
-          break;
-        case 'addTableColumn':
-          addTableColumn();
-          break;
-        case 'deleteTableRow':
-          deleteTableRow();
-          break;
-        case 'deleteTableColumn':
-          deleteTableColumn();
-          break;
-        case 'deleteTable':
-          deleteTable();
-          break;
+        }
+
+        case 'addTableRow':    addTableRow();    break;
+        case 'addTableColumn': addTableColumn(); break;
+        case 'deleteTableRow': deleteTableRow(); break;
+        case 'deleteTableColumn': deleteTableColumn(); break;
+        case 'deleteTable':    deleteTable();    break;
+
         case 'setPaperSize':
           applyPaperSize(msg.paperSize);
           break;
+
         case 'getContent':
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'content', delta: JSON.stringify(quill.getContents()),
           }));
           break;
+
         case 'findReplace': {
           const text = quill.getText();
           const find = msg.find;
@@ -336,6 +332,7 @@ export function buildQuillHtml(
           }));
           break;
         }
+
         case 'getHeadings': {
           const delta = quill.getContents();
           const headings = [];
@@ -358,6 +355,7 @@ export function buildQuillHtml(
           }));
           break;
         }
+
         case 'scrollTo':
           quill.setSelection(msg.index, 0);
           break;
@@ -370,7 +368,6 @@ export function buildQuillHtml(
       }
     }
 
-    // Signal ready
     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
   </script>
 </body>
