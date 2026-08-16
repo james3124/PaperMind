@@ -1,6 +1,7 @@
 import { complete, stream, CompletionMessage } from './llamaService';
 import { searchLiterature, SourcePaper } from './literatureSearch';
 import { documentRepository } from '@/db/DocumentRepository';
+import { markdownToDeltaJson } from '@/utils/markdownToQuillDelta';
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -62,10 +63,8 @@ const WORD_TARGETS: Record<PipelineConfig['paperLength'], Record<string, number>
 
 function formatSources(sources: SourcePaper[]): string {
   return sources
-    .map(
-      (s, i) =>
-        `${i + 1}. ${s.authors.slice(0, 3).join(', ')} (${s.year}). ${s.title}. ${s.abstract.slice(0, 200)}…`
-    )
+    .map((s, i) =>
+      `${i + 1}. ${s.authors.slice(0, 3).join(', ')} (${s.year}). ${s.title}. ${s.abstract.slice(0, 200)}…`)
     .join('\n');
 }
 
@@ -122,24 +121,18 @@ Plan a complete academic research paper. Return this exact JSON shape:
   "keywords": ["...", "..."]
 }`;
 
-  const raw = await complete(
-    [{ role: 'user', content: prompt }],
-    0.3,   // low temp for JSON
-    1024,
-  );
+  const raw = await complete([{ role: 'user', content: prompt }], 0.3, 1024);
 
   try {
     return JSON.parse(raw) as PaperPlan;
   } catch {
-    // Retry once with stricter prompt
     const retry = await complete(
       [
         { role: 'user',      content: prompt },
         { role: 'assistant', content: raw },
         { role: 'user',      content: 'The JSON above is malformed. Return ONLY valid JSON, nothing else.' },
       ],
-      0.1,
-      1024,
+      0.1, 1024,
     );
     return JSON.parse(retry) as PaperPlan;
   }
@@ -183,11 +176,11 @@ async function* runSection(
   key: SectionKey,
   config: PipelineConfig,
   plan: PaperPlan,
-  sources: SourcePaper[]
+  sources: SourcePaper[],
 ): AsyncGenerator<string> {
-  const targets = WORD_TARGETS[config.paperLength];
+  const targets    = WORD_TARGETS[config.paperLength];
   const wordTarget = targets[WORD_TARGET_KEYS[key]];
-  const citStyle = `${config.citationStyle.toUpperCase()} ${config.citationEdition}`.trim();
+  const citStyle   = `${config.citationStyle.toUpperCase()} ${config.citationEdition}`.trim();
 
   const systemPrompt = `You are PaperMind, an expert academic writer.
 Write in formal academic English appropriate for ${config.academicLevel} level.
@@ -208,8 +201,6 @@ ${formatSources(sources)}
 Write the ${SECTION_NAMES[key]} section.
 Use ${citStyle} in-text citations where appropriate, citing only the sources listed above.`;
 
-  // llama.rn uses a token callback (not AsyncGenerator) — collect tokens
-  // into an array, then yield the full section text as a chunk.
   const tokens: string[] = [];
   await stream(
     [
@@ -217,8 +208,7 @@ Use ${citStyle} in-text citations where appropriate, citing only the sources lis
       { role: 'user',   content: userPrompt },
     ],
     (token) => { tokens.push(token); },
-    0.7,
-    1024,
+    0.7, 1024,
   );
 
   yield tokens.join('');
@@ -235,10 +225,9 @@ async function runAbstractAndReferences(
   config: PipelineConfig,
   plan: PaperPlan,
   draft: string,
-  sources: SourcePaper[]
+  sources: SourcePaper[],
 ): Promise<AbstractAndReferences> {
-  // Slice to fit 2048-token context window
-  const draftSlice = draft.slice(0, 1200);
+  const draftSlice   = draft.slice(0, 1200);
   const sourcesSlice = sources.slice(0, 5);
 
   const prompt = `Given the following research paper draft:
@@ -252,16 +241,11 @@ ${formatSourcesForReferences(sourcesSlice)}
 2. Generate a complete References section using ONLY the provided real sources.
    Format in ${config.citationStyle.toUpperCase()} ${config.citationEdition} style.
    Sort alphabetically by first author last name.
-   Bold "References" as the section heading.
 
 Return ONLY valid JSON — no markdown:
 { "abstract": "...", "references": "..." }`;
 
-  const raw = await complete(
-    [{ role: 'user', content: prompt }],
-    0.3,
-    1024,
-  );
+  const raw = await complete([{ role: 'user', content: prompt }], 0.3, 1024);
 
   try {
     return JSON.parse(raw) as AbstractAndReferences;
@@ -272,7 +256,7 @@ Return ONLY valid JSON — no markdown:
 
 async function runStyleAndProofread(
   config: PipelineConfig,
-  draft: string
+  draft: string,
 ): Promise<string> {
   const prompt = `You are an expert academic editor. Review the following research paper and:
 1. Fix any grammar, punctuation, or spelling errors
@@ -283,18 +267,12 @@ async function runStyleAndProofread(
 Paper:
 ${draft.slice(0, 1500)}`;
 
-  return await complete(
-    [{ role: 'user', content: prompt }],
-    0.2,
-    1024,
-  );
+  return await complete([{ role: 'user', content: prompt }], 0.2, 1024);
 }
 
 // ── Main pipeline ─────────────────────────────────────────────────────────────
 
-export async function* runPipeline(
-  config: PipelineConfig
-): AsyncGenerator<PipelineEvent> {
+export async function* runPipeline(config: PipelineConfig): AsyncGenerator<PipelineEvent> {
   const sections: SectionKey[] = [
     'introduction', 'litReview', 'background',
     'methodology', 'results', 'discussion', 'conclusion',
@@ -382,19 +360,19 @@ export async function* runPipeline(
   let polishedDraft = draft;
   try {
     polishedDraft = await runStyleAndProofread(config, draft);
-  } catch (e: unknown) {
-    yield { type: 'error', message: `Proofreading failed — using unpolished draft`, fatal: false };
+  } catch {
+    yield { type: 'error', message: 'Proofreading failed — using unpolished draft', fatal: false };
   }
 
   yield stageEvent(15, 'stage-complete');
   yield stageEvent(16, 'stage-complete');
 
-  // ── Batch 4: Local output (stages 17–19) ─────────────────────────────────────
+  // ── Batch 4: Assemble + Save (stages 17–19) ──────────────────────────────────
 
   yield stageEvent(17, 'stage-start');
 
-  // Assemble full paper as plain text (editor imports this as content)
-  const fullPaper = [
+  // Assemble full paper as plain text first (for word count)
+  const fullPaperText = [
     plan.title,
     '',
     'Abstract',
@@ -406,12 +384,14 @@ export async function* runPipeline(
     abstractAndRefs.references,
   ].join('\n\n');
 
+  // Convert to Quill Delta JSON — fixes ** markers, section headers bold,
+  // and first-line paragraph indent before saving to the editor.
+  const fullPaperDelta = markdownToDeltaJson(fullPaperText);
+
   yield stageEvent(17, 'stage-complete');
 
   yield stageEvent(18, 'stage-start');
-
-  const wordCount = fullPaper.split(/\s+/).filter(Boolean).length;
-
+  const wordCount = fullPaperText.split(/\s+/).filter(Boolean).length;
   yield stageEvent(18, 'stage-complete');
 
   // ── Stage 19: Save to WatermelonDB ────────────────────────────────────────────
@@ -425,7 +405,7 @@ export async function* runPipeline(
       citationEdition: config.citationEdition,
     });
     await documentRepository.update(doc.id, {
-      content:   fullPaper,
+      content:   fullPaperDelta,   // ← saved as Quill Delta JSON
       wordCount,
       status:    'aiReady',
     });
