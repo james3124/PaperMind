@@ -1,10 +1,11 @@
-import React, { useEffect, useState, Component, ReactNode } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useEffect, Component, ReactNode } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DatabaseProvider } from '@nozbe/watermelondb/DatabaseProvider';
 import { database }    from '@/db/database';
 import AppNavigator    from '@/navigation/AppNavigator';
-import { modelExists, bundledModelExists, copyBundledModel, getModelPath } from '@/utils/modelPaths';
+import { useModelDownloadStore } from '@/stores/modelDownloadStore';
+import { modelExists, getModelPath } from '@/utils/modelPaths';
 import { initModel }   from '@/services/llamaService';
 
 interface EBState { hasError: boolean; error?: Error }
@@ -27,57 +28,29 @@ class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
 }
 
 export default function App() {
-  const [initialRoute, setInitialRoute] = useState<'Library' | 'ModelDownload' | null>(null);
-  const [loadingMsg, setLoadingMsg] = useState('Starting PaperMind…'); 
+  const bootstrap = useModelDownloadStore(s => s.bootstrap);
+  const setModelReady = useModelDownloadStore(s => s.setModelReady);
 
   useEffect(() => {
-    async function checkModel() {
-      // Already downloaded to internal storage — load straight away.
+    async function init() {
+      // If model already on disk, init llama quietly in background
       if (await modelExists()) {
-        await tryInitModel('Library');
+        setModelReady(true);
+        try { await initModel(getModelPath()); } catch { /* non-fatal */ }
         return;
       }
-
-      // Not in storage yet. If a model is bundled in the APK assets, copy it
-      // into storage once, then load. No download screen needed.
-      if (await bundledModelExists()) {
-        setLoadingMsg('Preparing model (first launch, one-time)…');
-        await copyBundledModel();
-        setLoadingMsg('Loading AI model into memory…'); 
-        await tryInitModel('Library');
-        return;
-      }
-
-      // No local model — full download flow.
-      setInitialRoute('ModelDownload');
+      // No model — start background download
+      bootstrap();
     }
-
-    async function tryInitModel(route: 'Library') {
-      try {
-        await initModel(getModelPath());
-        setInitialRoute(route);
-      } catch {
-        setInitialRoute('ModelDownload');
-      }
-    }
-
-    checkModel().catch(() => setInitialRoute('ModelDownload'));
+    init();
   }, []);
-
-  if (!initialRoute) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#6366f1" />
-        <Text style={styles.loadingText}>{loadingMsg}</Text>
-      </View>
-    );
-  }
 
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
         <DatabaseProvider database={database}>
-          <AppNavigator initialRoute={initialRoute} />
+          {/* Always go straight to Library — banner handles download state */}
+          <AppNavigator initialRoute="Library" />
         </DatabaseProvider>
       </SafeAreaProvider>
     </ErrorBoundary>
@@ -85,9 +58,10 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  loading: { flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', gap: 16 },
-  loadingText: { color: '#94a3b8', fontSize: 14 },
-  errorContainer: { flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  errorContainer: {
+    flex: 1, backgroundColor: '#0f172a',
+    justifyContent: 'center', alignItems: 'center', padding: 24,
+  },
   errorTitle: { color: '#f87171', fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
-  errorMsg: { color: '#94a3b8', fontSize: 13, textAlign: 'center' },
+  errorMsg:   { color: '#94a3b8', fontSize: 13, textAlign: 'center' },
 });
