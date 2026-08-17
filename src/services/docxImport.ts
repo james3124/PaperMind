@@ -22,19 +22,31 @@ function parseParagraph(paraXml: string): string {
 
   // Extract all text runs
   const runs = extractTag(paraXml, 'w:r');
-  const text = runs.map((run) => {
-    // Check for line break
-    if (run.includes('<w:br/>') || run.includes('<w:br />')) return '\n';
-    const tMatches = extractTag(run, 'w:t');
-    return tMatches.join('');
-  }).join('');
+  const text = runs
+    .map(run => {
+      // Check for line break
+      if (run.includes('<w:br/>') || run.includes('<w:br />')) {
+        return '\n';
+      }
+      const tMatches = extractTag(run, 'w:t');
+      return tMatches.join('');
+    })
+    .join('');
 
-  if (!text.trim()) return '';
+  if (!text.trim()) {
+    return '';
+  }
 
   // Add heading markers for context
-  if (style.includes('Heading1') || style === 'h1') return `\n${text}\n`;
-  if (style.includes('Heading2') || style === 'h2') return `\n${text}\n`;
-  if (style.includes('Heading3') || style === 'h3') return `\n${text}\n`;
+  if (style.includes('Heading1') || style === 'h1') {
+    return `\n${text}\n`;
+  }
+  if (style.includes('Heading2') || style === 'h2') {
+    return `\n${text}\n`;
+  }
+  if (style.includes('Heading3') || style === 'h3') {
+    return `\n${text}\n`;
+  }
 
   return text;
 }
@@ -46,25 +58,29 @@ export async function importDocx(filePath: string): Promise<string> {
   const base64 = await RNFS.readFile(filePath, 'base64');
 
   // Unzip
-  const zip = await JSZip.loadAsync(base64, { base64: true });
+  const zip = await JSZip.loadAsync(base64, {base64: true});
 
   // Get word/document.xml
   const docFile = zip.file('word/document.xml');
-  if (!docFile) throw new Error('Invalid DOCX: missing word/document.xml');
+  if (!docFile) {
+    throw new Error('Invalid DOCX: missing word/document.xml');
+  }
 
   const xml = await docFile.async('text');
 
   // Extract body
   const bodyMatch = xml.match(/<w:body>([\s\S]*?)<\/w:body>/);
-  if (!bodyMatch) throw new Error('Invalid DOCX: missing w:body');
+  if (!bodyMatch) {
+    throw new Error('Invalid DOCX: missing w:body');
+  }
 
   const bodyXml = bodyMatch[1];
 
   // Parse paragraphs
   const paragraphs = extractTag(bodyXml, 'w:p');
   const lines = paragraphs
-    .map((p) => parseParagraph(p))
-    .filter((line) => line !== '');
+    .map(p => parseParagraph(p))
+    .filter(line => line !== '');
 
   return lines.join('\n').trim();
 }

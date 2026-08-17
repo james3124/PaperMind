@@ -3,7 +3,7 @@
 jest.mock('../database', () => ({
   database: {
     get: () => ({
-      query: () => ({ observe: () => ({}) }),
+      query: () => ({observe: () => ({})}),
       find: async () => null,
       create: async () => ({}),
     }),
@@ -11,7 +11,7 @@ jest.mock('../database', () => ({
   },
 }));
 
-import { documentRepository } from '../DocumentRepository';
+import {documentRepository} from '../DocumentRepository';
 
 describe('documentRepository interface', () => {
   it('exports getAll function', () => {

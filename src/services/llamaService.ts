@@ -1,9 +1,9 @@
-import { initLlama, LlamaContext } from 'llama.rn';
-import { getModelPath } from '@/utils/modelPaths';
-import { useSettingsStore } from '@/stores/settingsStore';
+import {initLlama, LlamaContext} from 'llama.rn';
+import {getModelPath} from '@/utils/modelPaths';
+import {useSettingsStore} from '@/stores/settingsStore';
 
 export interface CompletionMessage {
-  role:    'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
@@ -40,17 +40,19 @@ export function isModelLoaded(): boolean {
 }
 
 export async function initModel(modelPath: string): Promise<void> {
-  if (_context) return; // Already loaded
+  if (_context) {
+    return;
+  } // Already loaded
   if (_loadingPromise) {
     await _loadingPromise;
     return;
   }
   _loadingPromise = (async () => {
     _context = await initLlama({
-      model:        modelPath,
-      n_ctx:        2048,
-      n_threads:    4,
-      n_gpu_layers: 0,   // CPU only — Android GPU support is unstable
+      model: modelPath,
+      n_ctx: 2048,
+      n_threads: 4,
+      n_gpu_layers: 0, // CPU only — Android GPU support is unstable
     });
     resetIdleTimer();
     useSettingsStore.getState().setModelLoaded(true);
@@ -90,9 +92,9 @@ const TOKEN_REARM_THROTTLE_MS = 1000;
 let _lastTokenRearm = 0;
 
 export async function complete(
-  messages:     CompletionMessage[],
-  temperature:  number = 0.7,
-  maxTokens:    number = 1024,
+  messages: CompletionMessage[],
+  temperature: number = 0.7,
+  maxTokens: number = 1024,
 ): Promise<string> {
   await ensureModelLoaded();
   clearIdleTimer();
@@ -100,9 +102,9 @@ export async function complete(
     const prompt = formatChatML(messages);
     const result = await _context!.completion({
       prompt,
-      n_predict:   maxTokens,
+      n_predict: maxTokens,
       temperature,
-      stop:        ['<|im_end|>', '<|im_start|>'],
+      stop: ['<|im_end|>', '<|im_start|>'],
     });
     return result.text.trim();
   } finally {
@@ -111,10 +113,10 @@ export async function complete(
 }
 
 export async function stream(
-  messages:    CompletionMessage[],
-  onToken:     (token: string) => void,
+  messages: CompletionMessage[],
+  onToken: (token: string) => void,
   temperature: number = 0.7,
-  maxTokens:   number = 1024,
+  maxTokens: number = 1024,
 ): Promise<void> {
   await ensureModelLoaded();
   clearIdleTimer();
@@ -124,11 +126,11 @@ export async function stream(
     await _context!.completion(
       {
         prompt,
-        n_predict:   maxTokens,
+        n_predict: maxTokens,
         temperature,
-        stop:        ['<|im_end|>', '<|im_start|>'],
+        stop: ['<|im_end|>', '<|im_start|>'],
       },
-      (data) => {
+      data => {
         if (data.token) {
           const now = Date.now();
           if (now - _lastTokenRearm > TOKEN_REARM_THROTTLE_MS) {
@@ -137,7 +139,7 @@ export async function stream(
           }
           onToken(data.token);
         }
-      }
+      },
     );
   } finally {
     resetIdleTimer();

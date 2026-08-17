@@ -20,5 +20,7 @@ export async function modelExists(): Promise<boolean> {
 export async function ensureModelDir(): Promise<void> {
   const dir = getModelDir();
   const exists = await RNFS.exists(dir);
-  if (!exists) await RNFS.mkdir(dir);
+  if (!exists) {
+    await RNFS.mkdir(dir);
+  }
 }

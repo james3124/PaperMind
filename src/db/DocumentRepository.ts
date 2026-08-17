@@ -1,6 +1,6 @@
-import { Q } from '@nozbe/watermelondb';
-import { database } from './database';
-import Document, { DocumentStatus } from './models/Document';
+import {Q} from '@nozbe/watermelondb';
+import {database} from './database';
+import Document, {DocumentStatus} from './models/Document';
 
 const collection = database.get<Document>('documents');
 
@@ -19,18 +19,18 @@ export const documentRepository = {
 
   async create(
     title: string,
-    options: Partial<{ citationStyle: string; citationEdition: string }> = {}
+    options: Partial<{citationStyle: string; citationEdition: string}> = {},
   ): Promise<Document> {
     return await database.write(async () => {
-      return await collection.create((doc) => {
-        doc.title           = title;
-        doc.content         = '';
-        doc.wordCount       = 0;
-        doc.citationStyle   = options.citationStyle   ?? 'apa';
+      return await collection.create(doc => {
+        doc.title = title;
+        doc.content = '';
+        doc.wordCount = 0;
+        doc.citationStyle = options.citationStyle ?? 'apa';
         doc.citationEdition = options.citationEdition ?? '7th';
-        doc.status          = 'draft';
-        doc.starred         = false;
-        doc.updatedAt       = new Date();
+        doc.status = 'draft';
+        doc.starred = false;
+        doc.updatedAt = new Date();
       });
     });
   },
@@ -38,25 +38,39 @@ export const documentRepository = {
   async update(
     id: string,
     changes: Partial<{
-      title:           string;
-      content:         string;
-      wordCount:       number;
-      citationStyle:   string;
+      title: string;
+      content: string;
+      wordCount: number;
+      citationStyle: string;
       citationEdition: string;
-      status:          DocumentStatus;
-      starred:         boolean;
-    }>
+      status: DocumentStatus;
+      starred: boolean;
+    }>,
   ): Promise<void> {
     const doc = await collection.find(id);
     await database.write(async () => {
-      await doc.update((d) => {
-        if (changes.title           !== undefined) d.title           = changes.title;
-        if (changes.content         !== undefined) d.content         = changes.content;
-        if (changes.wordCount       !== undefined) d.wordCount       = changes.wordCount;
-        if (changes.citationStyle   !== undefined) d.citationStyle   = changes.citationStyle;
-        if (changes.citationEdition !== undefined) d.citationEdition = changes.citationEdition;
-        if (changes.status          !== undefined) d.status          = changes.status;
-        if (changes.starred         !== undefined) d.starred         = changes.starred;
+      await doc.update(d => {
+        if (changes.title !== undefined) {
+          d.title = changes.title;
+        }
+        if (changes.content !== undefined) {
+          d.content = changes.content;
+        }
+        if (changes.wordCount !== undefined) {
+          d.wordCount = changes.wordCount;
+        }
+        if (changes.citationStyle !== undefined) {
+          d.citationStyle = changes.citationStyle;
+        }
+        if (changes.citationEdition !== undefined) {
+          d.citationEdition = changes.citationEdition;
+        }
+        if (changes.status !== undefined) {
+          d.status = changes.status;
+        }
+        if (changes.starred !== undefined) {
+          d.starred = changes.starred;
+        }
         d.updatedAt = new Date();
       });
     });
@@ -65,15 +79,15 @@ export const documentRepository = {
   async duplicate(id: string): Promise<Document> {
     const original = await collection.find(id);
     return await database.write(async () => {
-      return await collection.create((doc) => {
-        doc.title           = `Copy of ${original.title}`;
-        doc.content         = original.content;
-        doc.wordCount       = original.wordCount;
-        doc.citationStyle   = original.citationStyle;
+      return await collection.create(doc => {
+        doc.title = `Copy of ${original.title}`;
+        doc.content = original.content;
+        doc.wordCount = original.wordCount;
+        doc.citationStyle = original.citationStyle;
         doc.citationEdition = original.citationEdition;
-        doc.status          = 'draft';
-        doc.starred         = false;
-        doc.updatedAt       = new Date();
+        doc.status = 'draft';
+        doc.starred = false;
+        doc.updatedAt = new Date();
       });
     });
   },

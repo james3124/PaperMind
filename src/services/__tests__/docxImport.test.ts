@@ -26,7 +26,8 @@ describe('docxImport XML parsing', () => {
   });
 
   it('detects heading style in paragraph XML', () => {
-    const paraXml = '<w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Introduction</w:t></w:r>';
+    const paraXml =
+      '<w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Introduction</w:t></w:r>';
     const styleMatch = paraXml.match(/<w:pStyle[^>]*w:val="([^"]+)"/);
     expect(styleMatch?.[1]).toBe('Heading1');
   });
@@ -36,13 +37,15 @@ describe('docxImport XML parsing', () => {
       '<w:r><w:t>Hello </w:t></w:r>',
       '<w:r><w:t>World</w:t></w:r>',
     ].join('');
-    const texts = runs.match(/<w:t[^>]*>([^<]*)<\/w:t>/g)
-      ?.map((t) => t.replace(/<[^>]+>/g, '')) ?? [];
+    const texts =
+      runs
+        .match(/<w:t[^>]*>([^<]*)<\/w:t>/g)
+        ?.map(t => t.replace(/<[^>]+>/g, '')) ?? [];
     expect(texts.join('')).toBe('Hello World');
   });
 
   it('importDocx is exported as a function', () => {
-    const { importDocx } = require('../docxImport');
+    const {importDocx} = require('../docxImport');
     expect(typeof importDocx).toBe('function');
   });
 });

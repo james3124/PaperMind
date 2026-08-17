@@ -2,7 +2,7 @@
 jest.mock('react-native-fs', () => ({
   DocumentDirectoryPath: '/data/user/0/com.papermind/files',
   exists: jest.fn().mockResolvedValue(false),
-  mkdir:  jest.fn().mockResolvedValue(undefined),
+  mkdir: jest.fn().mockResolvedValue(undefined),
 }));
 
 // WatermelonDB's SQLite adapter can't run in Node (JSI) — mock the
@@ -14,7 +14,7 @@ jest.mock('@/db/DocumentRepository', () => ({
   },
 }));
 
-import { STAGE_LABELS, PipelineConfig } from '../pipelineService';
+import {STAGE_LABELS, PipelineConfig} from '../pipelineService';
 
 describe('STAGE_LABELS', () => {
   it('has exactly 19 stages', () => {
@@ -34,7 +34,7 @@ describe('STAGE_LABELS', () => {
   });
 
   it('all labels are non-empty strings', () => {
-    STAGE_LABELS.forEach((label) => {
+    STAGE_LABELS.forEach(label => {
       expect(typeof label).toBe('string');
       expect(label.length).toBeGreaterThan(0);
     });
@@ -44,11 +44,11 @@ describe('STAGE_LABELS', () => {
 describe('PipelineConfig type shape', () => {
   it('accepts valid config', () => {
     const config: PipelineConfig = {
-      topic:           'Mobile learning in Philippine high schools',
-      researchType:    'quantitative',
-      academicLevel:   'shs',
-      paperLength:     'standard',
-      citationStyle:   'apa',
+      topic: 'Mobile learning in Philippine high schools',
+      researchType: 'quantitative',
+      academicLevel: 'shs',
+      paperLength: 'standard',
+      citationStyle: 'apa',
       citationEdition: '7th',
     };
     expect(config.topic).toBeTruthy();

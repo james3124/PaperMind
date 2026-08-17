@@ -5,35 +5,37 @@ import {buildQuillHtml} from './quillHtml';
 import type {PaperSize} from '@/stores/settingsStore';
 
 export interface EditorRef {
-  format:            (key: string, value: unknown) => void;
-  insertText:        (text: string) => void;
-  insertDelta:       (deltaJson: string) => void;   // ← NEW
-  insertImage:       (dataUrl: string) => void;
-  insertTable:       (rows: number, cols: number) => void;
-  insertPageBreak:   () => void;
-  addTableRow:       () => void;
-  addTableColumn:    () => void;
-  deleteTableRow:    () => void;
+  format: (key: string, value: unknown) => void;
+  insertText: (text: string) => void;
+  insertDelta: (deltaJson: string) => void; // ← NEW
+  insertImage: (dataUrl: string) => void;
+  insertTable: (rows: number, cols: number) => void;
+  insertPageBreak: () => void;
+  addTableRow: () => void;
+  addTableColumn: () => void;
+  deleteTableRow: () => void;
   deleteTableColumn: () => void;
-  deleteTable:       () => void;
-  findReplace:       (find: string, replace: string) => void;
-  getHeadings:       () => void;
-  scrollTo:          (index: number) => void;
-  undo:              () => void;
-  redo:              () => void;
-  setPaperSize:      (paperSize: PaperSize) => void;
-  getContent:        (onContent: (delta: string) => void) => void;
+  deleteTable: () => void;
+  findReplace: (find: string, replace: string) => void;
+  getHeadings: () => void;
+  scrollTo: (index: number) => void;
+  undo: () => void;
+  redo: () => void;
+  setPaperSize: (paperSize: PaperSize) => void;
+  getContent: (onContent: (delta: string) => void) => void;
 }
 
 interface Props {
-  initialContent:  string;
-  paperSize:       PaperSize;
+  initialContent: string;
+  paperSize: PaperSize;
   onContentChange: (delta: string, wordCount: number) => void;
-  onFormatChange:  (format: Record<string, unknown>) => void;
-  onHeadings:      (headings: {level: number; text: string; index: number}[]) => void;
+  onFormatChange: (format: Record<string, unknown>) => void;
+  onHeadings: (
+    headings: {level: number; text: string; index: number}[],
+  ) => void;
   onReplaceResult: (count: number) => void;
   onSelectionText?: (text: string) => void;
-  onReady:         () => void;
+  onReady: () => void;
 }
 
 const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
@@ -50,23 +52,24 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
   }
 
   useImperativeHandle(ref, () => ({
-    format:            (key, value) => postCmd({cmd: 'format', key, value}),
-    insertText:        text        => postCmd({cmd: 'insertText', text}),
-    insertDelta:       deltaJson   => postCmd({cmd: 'insertDelta', delta: deltaJson}), // ← NEW
-    insertImage:       dataUrl     => postCmd({cmd: 'insertImage', dataUrl}),
-    insertTable:       (rows, cols)=> postCmd({cmd: 'insertTable', rows, cols}),
-    insertPageBreak:   ()          => postCmd({cmd: 'insertPageBreak'}),
-    addTableRow:       ()          => postCmd({cmd: 'addTableRow'}),
-    addTableColumn:    ()          => postCmd({cmd: 'addTableColumn'}),
-    deleteTableRow:    ()          => postCmd({cmd: 'deleteTableRow'}),
-    deleteTableColumn: ()          => postCmd({cmd: 'deleteTableColumn'}),
-    deleteTable:       ()          => postCmd({cmd: 'deleteTable'}),
-    findReplace:       (find, replace) => postCmd({cmd: 'findReplace', find, replace}),
-    getHeadings:       ()          => postCmd({cmd: 'getHeadings'}),
-    scrollTo:          index       => postCmd({cmd: 'scrollTo', index}),
-    undo:              ()          => postCmd({cmd: 'undo'}),
-    redo:              ()          => postCmd({cmd: 'redo'}),
-    setPaperSize:      paperSize   => postCmd({cmd: 'setPaperSize', paperSize}),
+    format: (key, value) => postCmd({cmd: 'format', key, value}),
+    insertText: text => postCmd({cmd: 'insertText', text}),
+    insertDelta: deltaJson => postCmd({cmd: 'insertDelta', delta: deltaJson}), // ← NEW
+    insertImage: dataUrl => postCmd({cmd: 'insertImage', dataUrl}),
+    insertTable: (rows, cols) => postCmd({cmd: 'insertTable', rows, cols}),
+    insertPageBreak: () => postCmd({cmd: 'insertPageBreak'}),
+    addTableRow: () => postCmd({cmd: 'addTableRow'}),
+    addTableColumn: () => postCmd({cmd: 'addTableColumn'}),
+    deleteTableRow: () => postCmd({cmd: 'deleteTableRow'}),
+    deleteTableColumn: () => postCmd({cmd: 'deleteTableColumn'}),
+    deleteTable: () => postCmd({cmd: 'deleteTable'}),
+    findReplace: (find, replace) =>
+      postCmd({cmd: 'findReplace', find, replace}),
+    getHeadings: () => postCmd({cmd: 'getHeadings'}),
+    scrollTo: index => postCmd({cmd: 'scrollTo', index}),
+    undo: () => postCmd({cmd: 'undo'}),
+    redo: () => postCmd({cmd: 'redo'}),
+    setPaperSize: paperSize => postCmd({cmd: 'setPaperSize', paperSize}),
     getContent: onContent => {
       pendingGetContent.current = onContent;
       postCmd({cmd: 'getContent'});

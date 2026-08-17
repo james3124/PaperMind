@@ -1,31 +1,35 @@
-import { complete, stream, CompletionMessage } from './llamaService';
-import { searchLiterature, SourcePaper } from './literatureSearch';
-import { documentRepository } from '@/db/DocumentRepository';
-import { markdownToDeltaJson } from '@/utils/markdownToQuillDelta';
+import {complete, stream} from './llamaService';
+import {searchLiterature, SourcePaper} from './literatureSearch';
+import {documentRepository} from '@/db/DocumentRepository';
+import {markdownToDeltaJson} from '@/utils/markdownToQuillDelta';
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
 export interface PipelineConfig {
-  topic:           string;
-  researchType:    'quantitative' | 'qualitative' | 'mixed' | 'literature-review';
-  academicLevel:   'shs' | 'undergraduate' | 'graduate';
-  paperLength:     'short' | 'standard' | 'long';
-  citationStyle:   string;
+  topic: string;
+  researchType: 'quantitative' | 'qualitative' | 'mixed' | 'literature-review';
+  academicLevel: 'shs' | 'undergraduate' | 'graduate';
+  paperLength: 'short' | 'standard' | 'long';
+  citationStyle: string;
   citationEdition: string;
 }
 
 export type PipelineEventType =
-  | 'stage-start' | 'stage-complete' | 'token'
-  | 'sources-found' | 'error' | 'complete';
+  | 'stage-start'
+  | 'stage-complete'
+  | 'token'
+  | 'sources-found'
+  | 'error'
+  | 'complete';
 
 export interface PipelineEvent {
-  type:        PipelineEventType;
-  stage?:      number;
-  label?:      string;
-  text?:       string;
-  count?:      number;
-  message?:    string;
-  fatal?:      boolean;
+  type: PipelineEventType;
+  stage?: number;
+  label?: string;
+  text?: string;
+  count?: number;
+  message?: string;
+  fatal?: boolean;
   documentId?: string;
 }
 
@@ -53,43 +57,77 @@ export const STAGE_LABELS: string[] = [
 
 // ── Word targets ──────────────────────────────────────────────────────────────
 
-const WORD_TARGETS: Record<PipelineConfig['paperLength'], Record<string, number>> = {
-  short:    { intro: 150, litReview: 250, background: 150, methodology: 200, results: 200, discussion: 200, conclusion: 125 },
-  standard: { intro: 300, litReview: 500, background: 300, methodology: 400, results: 400, discussion: 400, conclusion: 250 },
-  long:     { intro: 500, litReview: 850, background: 500, methodology: 680, results: 680, discussion: 680, conclusion: 425 },
+const WORD_TARGETS: Record<
+  PipelineConfig['paperLength'],
+  Record<string, number>
+> = {
+  short: {
+    intro: 150,
+    litReview: 250,
+    background: 150,
+    methodology: 200,
+    results: 200,
+    discussion: 200,
+    conclusion: 125,
+  },
+  standard: {
+    intro: 300,
+    litReview: 500,
+    background: 300,
+    methodology: 400,
+    results: 400,
+    discussion: 400,
+    conclusion: 250,
+  },
+  long: {
+    intro: 500,
+    litReview: 850,
+    background: 500,
+    methodology: 680,
+    results: 680,
+    discussion: 680,
+    conclusion: 425,
+  },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatSources(sources: SourcePaper[]): string {
   return sources
-    .map((s, i) =>
-      `${i + 1}. ${s.authors.slice(0, 3).join(', ')} (${s.year}). ${s.title}. ${s.abstract.slice(0, 200)}…`)
+    .map(
+      (s, i) =>
+        `${i + 1}. ${s.authors.slice(0, 3).join(', ')} (${s.year}). ${
+          s.title
+        }. ${s.abstract.slice(0, 200)}…`,
+    )
     .join('\n');
 }
 
 function formatSourcesForReferences(sources: SourcePaper[]): string {
-  return sources.map((s) => JSON.stringify(s)).join('\n');
+  return sources.map(s => JSON.stringify(s)).join('\n');
 }
 
-function stageEvent(stage: number, type: 'stage-start' | 'stage-complete'): PipelineEvent {
-  return { type, stage, label: STAGE_LABELS[stage - 1] };
+function stageEvent(
+  stage: number,
+  type: 'stage-start' | 'stage-complete',
+): PipelineEvent {
+  return {type, stage, label: STAGE_LABELS[stage - 1]};
 }
 
 // ── Batch 1: Planning ─────────────────────────────────────────────────────────
 
 interface PaperPlan {
-  title:             string;
+  title: string;
   researchQuestions: string[];
-  thesis:            string;
+  thesis: string;
   outline: {
-    introduction:  string;
-    litReview:     string;
-    background:    string;
-    methodology:   string;
-    results:       string;
-    discussion:    string;
-    conclusion:    string;
+    introduction: string;
+    litReview: string;
+    background: string;
+    methodology: string;
+    results: string;
+    discussion: string;
+    conclusion: string;
   };
   keywords: string[];
 }
@@ -121,18 +159,23 @@ Plan a complete academic research paper. Return this exact JSON shape:
   "keywords": ["...", "..."]
 }`;
 
-  const raw = await complete([{ role: 'user', content: prompt }], 0.3, 1024);
+  const raw = await complete([{role: 'user', content: prompt}], 0.3, 1024);
 
   try {
     return JSON.parse(raw) as PaperPlan;
   } catch {
     const retry = await complete(
       [
-        { role: 'user',      content: prompt },
-        { role: 'assistant', content: raw },
-        { role: 'user',      content: 'The JSON above is malformed. Return ONLY valid JSON, nothing else.' },
+        {role: 'user', content: prompt},
+        {role: 'assistant', content: raw},
+        {
+          role: 'user',
+          content:
+            'The JSON above is malformed. Return ONLY valid JSON, nothing else.',
+        },
       ],
-      0.1, 1024,
+      0.1,
+      1024,
     );
     return JSON.parse(retry) as PaperPlan;
   }
@@ -140,36 +183,43 @@ Plan a complete academic research paper. Return this exact JSON shape:
 
 // ── Batch 2: Writing ──────────────────────────────────────────────────────────
 
-type SectionKey = 'introduction' | 'litReview' | 'background' | 'methodology' | 'results' | 'discussion' | 'conclusion';
+type SectionKey =
+  | 'introduction'
+  | 'litReview'
+  | 'background'
+  | 'methodology'
+  | 'results'
+  | 'discussion'
+  | 'conclusion';
 
 const SECTION_NAMES: Record<SectionKey, string> = {
   introduction: 'Introduction',
-  litReview:    'Literature Review',
-  background:   'Background',
-  methodology:  'Methodology',
-  results:      'Results',
-  discussion:   'Discussion',
-  conclusion:   'Conclusion',
+  litReview: 'Literature Review',
+  background: 'Background',
+  methodology: 'Methodology',
+  results: 'Results',
+  discussion: 'Discussion',
+  conclusion: 'Conclusion',
 };
 
 const SECTION_STAGES: Record<SectionKey, number> = {
   introduction: 6,
-  litReview:    7,
-  background:   8,
-  methodology:  9,
-  results:      10,
-  discussion:   11,
-  conclusion:   12,
+  litReview: 7,
+  background: 8,
+  methodology: 9,
+  results: 10,
+  discussion: 11,
+  conclusion: 12,
 };
 
 const WORD_TARGET_KEYS: Record<SectionKey, string> = {
   introduction: 'intro',
-  litReview:    'litReview',
-  background:   'background',
-  methodology:  'methodology',
-  results:      'results',
-  discussion:   'discussion',
-  conclusion:   'conclusion',
+  litReview: 'litReview',
+  background: 'background',
+  methodology: 'methodology',
+  results: 'results',
+  discussion: 'discussion',
+  conclusion: 'conclusion',
 };
 
 async function* runSection(
@@ -178,9 +228,11 @@ async function* runSection(
   plan: PaperPlan,
   sources: SourcePaper[],
 ): AsyncGenerator<string> {
-  const targets    = WORD_TARGETS[config.paperLength];
+  const targets = WORD_TARGETS[config.paperLength];
   const wordTarget = targets[WORD_TARGET_KEYS[key]];
-  const citStyle   = `${config.citationStyle.toUpperCase()} ${config.citationEdition}`.trim();
+  const citStyle = `${config.citationStyle.toUpperCase()} ${
+    config.citationEdition
+  }`.trim();
 
   const systemPrompt = `You are PaperMind, an expert academic writer.
 Write in formal academic English appropriate for ${config.academicLevel} level.
@@ -204,11 +256,14 @@ Use ${citStyle} in-text citations where appropriate, citing only the sources lis
   const tokens: string[] = [];
   await stream(
     [
-      { role: 'system', content: systemPrompt },
-      { role: 'user',   content: userPrompt },
+      {role: 'system', content: systemPrompt},
+      {role: 'user', content: userPrompt},
     ],
-    (token) => { tokens.push(token); },
-    0.7, 1024,
+    token => {
+      tokens.push(token);
+    },
+    0.7,
+    1024,
   );
 
   yield tokens.join('');
@@ -217,7 +272,7 @@ Use ${citStyle} in-text citations where appropriate, citing only the sources lis
 // ── Batch 3: Polish ───────────────────────────────────────────────────────────
 
 interface AbstractAndReferences {
-  abstract:   string;
+  abstract: string;
   references: string;
 }
 
@@ -227,7 +282,7 @@ async function runAbstractAndReferences(
   draft: string,
   sources: SourcePaper[],
 ): Promise<AbstractAndReferences> {
-  const draftSlice   = draft.slice(0, 1200);
+  const draftSlice = draft.slice(0, 1200);
   const sourcesSlice = sources.slice(0, 5);
 
   const prompt = `Given the following research paper draft:
@@ -239,18 +294,20 @@ ${formatSourcesForReferences(sourcesSlice)}
 
 1. Write a structured abstract (150–250 words) covering: background, objective, methods, results, conclusion.
 2. Generate a complete References section using ONLY the provided real sources.
-   Format in ${config.citationStyle.toUpperCase()} ${config.citationEdition} style.
+   Format in ${config.citationStyle.toUpperCase()} ${
+    config.citationEdition
+  } style.
    Sort alphabetically by first author last name.
 
 Return ONLY valid JSON — no markdown:
 { "abstract": "...", "references": "..." }`;
 
-  const raw = await complete([{ role: 'user', content: prompt }], 0.3, 1024);
+  const raw = await complete([{role: 'user', content: prompt}], 0.3, 1024);
 
   try {
     return JSON.parse(raw) as AbstractAndReferences;
   } catch {
-    return { abstract: '', references: '' };
+    return {abstract: '', references: ''};
   }
 }
 
@@ -267,21 +324,28 @@ async function runStyleAndProofread(
 Paper:
 ${draft.slice(0, 1500)}`;
 
-  return await complete([{ role: 'user', content: prompt }], 0.2, 1024);
+  return await complete([{role: 'user', content: prompt}], 0.2, 1024);
 }
 
 // ── Main pipeline ─────────────────────────────────────────────────────────────
 
-export async function* runPipeline(config: PipelineConfig): AsyncGenerator<PipelineEvent> {
+export async function* runPipeline(
+  config: PipelineConfig,
+): AsyncGenerator<PipelineEvent> {
   const sections: SectionKey[] = [
-    'introduction', 'litReview', 'background',
-    'methodology', 'results', 'discussion', 'conclusion',
+    'introduction',
+    'litReview',
+    'background',
+    'methodology',
+    'results',
+    'discussion',
+    'conclusion',
   ];
 
   // ── Batch 1: Planning (stages 1–4) ──────────────────────────────────────────
 
   yield stageEvent(1, 'stage-start');
-  await new Promise((r) => setTimeout(r, 300));
+  await new Promise(r => setTimeout(r, 300));
   yield stageEvent(1, 'stage-complete');
 
   yield stageEvent(2, 'stage-start');
@@ -292,7 +356,11 @@ export async function* runPipeline(config: PipelineConfig): AsyncGenerator<Pipel
   try {
     plan = await runBatch1(config);
   } catch (e: unknown) {
-    yield { type: 'error', message: `Planning failed: ${e instanceof Error ? e.message : String(e)}`, fatal: true };
+    yield {
+      type: 'error',
+      message: `Planning failed: ${e instanceof Error ? e.message : String(e)}`,
+      fatal: true,
+    };
     return;
   }
 
@@ -306,9 +374,13 @@ export async function* runPipeline(config: PipelineConfig): AsyncGenerator<Pipel
   let sources: SourcePaper[] = [];
   try {
     sources = await searchLiterature(config.topic, plan.researchQuestions);
-    yield { type: 'sources-found', count: sources.length };
+    yield {type: 'sources-found', count: sources.length};
   } catch {
-    yield { type: 'error', message: 'Literature search failed — continuing without sources', fatal: false };
+    yield {
+      type: 'error',
+      message: 'Literature search failed — continuing without sources',
+      fatal: false,
+    };
   }
   yield stageEvent(5, 'stage-complete');
 
@@ -324,29 +396,46 @@ export async function* runPipeline(config: PipelineConfig): AsyncGenerator<Pipel
     try {
       for await (const chunk of runSection(key, config, plan, sources)) {
         sectionText += chunk;
-        yield { type: 'token', text: chunk };
+        yield {type: 'token', text: chunk};
       }
     } catch (e: unknown) {
-      yield { type: 'error', message: `${SECTION_NAMES[key]} writing failed: ${e instanceof Error ? e.message : String(e)}`, fatal: false };
-      sectionText = `[Section generation failed. Please regenerate.]`;
+      yield {
+        type: 'error',
+        message: `${SECTION_NAMES[key]} writing failed: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+        fatal: false,
+      };
+      sectionText = '[Section generation failed. Please regenerate.]';
     }
 
     sectionTexts[key] = sectionText;
     yield stageEvent(stageNum, 'stage-complete');
   }
 
-  const draft = sections.map((k) => sectionTexts[k] ?? '').join('\n\n');
+  const draft = sections.map(k => sectionTexts[k] ?? '').join('\n\n');
 
   // ── Batch 3a: Abstract + References (stages 13–14) ───────────────────────────
 
   yield stageEvent(13, 'stage-start');
   yield stageEvent(14, 'stage-start');
 
-  let abstractAndRefs: AbstractAndReferences = { abstract: '', references: '' };
+  let abstractAndRefs: AbstractAndReferences = {abstract: '', references: ''};
   try {
-    abstractAndRefs = await runAbstractAndReferences(config, plan, draft, sources);
+    abstractAndRefs = await runAbstractAndReferences(
+      config,
+      plan,
+      draft,
+      sources,
+    );
   } catch (e: unknown) {
-    yield { type: 'error', message: `Abstract/references failed: ${e instanceof Error ? e.message : String(e)}`, fatal: false };
+    yield {
+      type: 'error',
+      message: `Abstract/references failed: ${
+        e instanceof Error ? e.message : String(e)
+      }`,
+      fatal: false,
+    };
   }
 
   yield stageEvent(13, 'stage-complete');
@@ -361,7 +450,11 @@ export async function* runPipeline(config: PipelineConfig): AsyncGenerator<Pipel
   try {
     polishedDraft = await runStyleAndProofread(config, draft);
   } catch {
-    yield { type: 'error', message: 'Proofreading failed — using unpolished draft', fatal: false };
+    yield {
+      type: 'error',
+      message: 'Proofreading failed — using unpolished draft',
+      fatal: false,
+    };
   }
 
   yield stageEvent(15, 'stage-complete');
@@ -371,14 +464,15 @@ export async function* runPipeline(config: PipelineConfig): AsyncGenerator<Pipel
 
   yield stageEvent(17, 'stage-start');
 
-  // Assemble full paper as plain text first (for word count)
+  // Assemble full paper as plain text first (for word count).
+  // Use the proofread draft — falls back to raw draft if proofreading failed.
   const fullPaperText = [
     plan.title,
     '',
     'Abstract',
     abstractAndRefs.abstract,
     '',
-    ...sections.map((k) => `${SECTION_NAMES[k]}\n\n${sectionTexts[k] ?? ''}`),
+    polishedDraft,
     '',
     'References',
     abstractAndRefs.references,
@@ -401,20 +495,24 @@ export async function* runPipeline(config: PipelineConfig): AsyncGenerator<Pipel
   let documentId: string;
   try {
     const doc = await documentRepository.create(plan.title, {
-      citationStyle:   config.citationStyle,
+      citationStyle: config.citationStyle,
       citationEdition: config.citationEdition,
     });
     await documentRepository.update(doc.id, {
-      content:   fullPaperDelta,   // ← saved as Quill Delta JSON
+      content: fullPaperDelta, // ← saved as Quill Delta JSON
       wordCount,
-      status:    'aiReady',
+      status: 'aiReady',
     });
     documentId = doc.id;
   } catch (e: unknown) {
-    yield { type: 'error', message: `Failed to save: ${e instanceof Error ? e.message : String(e)}`, fatal: true };
+    yield {
+      type: 'error',
+      message: `Failed to save: ${e instanceof Error ? e.message : String(e)}`,
+      fatal: true,
+    };
     return;
   }
 
   yield stageEvent(19, 'stage-complete');
-  yield { type: 'complete', documentId };
+  yield {type: 'complete', documentId};
 }

@@ -1,15 +1,15 @@
-import { Database } from '@nozbe/watermelondb';
+import {Database} from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
-import { schema } from './schema';
-import { migrations } from './migrations';
+import {schema} from './schema';
+import {migrations} from './migrations';
 import Document from './models/Document';
 
 const adapter = new SQLiteAdapter({
   schema,
   migrations,
   dbName: 'papermind',
-  jsi: false,  // JSI disabled for SQLite stability on Android
-  onSetUpError: (error) => {
+  jsi: false, // JSI disabled for SQLite stability on Android
+  onSetUpError: error => {
     console.error('WatermelonDB setup error:', error);
   },
 });

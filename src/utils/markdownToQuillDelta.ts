@@ -46,14 +46,14 @@ function parseInline(line: string): Op[] {
 
   while ((match = regex.exec(line)) !== null) {
     if (match.index > last) {
-      ops.push({ insert: line.slice(last, match.index) });
+      ops.push({insert: line.slice(last, match.index)});
     }
-    ops.push({ insert: match[1], attributes: { bold: true } });
+    ops.push({insert: match[1], attributes: {bold: true}});
     last = regex.lastIndex;
   }
 
   if (last < line.length) {
-    ops.push({ insert: line.slice(last) });
+    ops.push({insert: line.slice(last)});
   }
 
   return ops;
@@ -70,7 +70,7 @@ export function markdownToQuillDelta(text: string): Op[] {
 
     if (trimmed === '') {
       if (inParagraph) {
-        ops.push({ insert: '\n' });
+        ops.push({insert: '\n'});
         inParagraph = false;
       }
       continue;
@@ -86,28 +86,28 @@ export function markdownToQuillDelta(text: string): Op[] {
 
     if (isHeader) {
       if (inParagraph) {
-        ops.push({ insert: '\n' });
+        ops.push({insert: '\n'});
         inParagraph = false;
       }
       const cleanHeader = lineText.replace(/\*\*/g, '');
-      ops.push({ insert: cleanHeader, attributes: { bold: true } });
-      ops.push({ insert: '\n', attributes: { header: 2 } });
+      ops.push({insert: cleanHeader, attributes: {bold: true}});
+      ops.push({insert: '\n', attributes: {header: 2}});
       continue;
     }
 
     // First line of paragraph → indent
     if (!inParagraph) {
-      ops.push({ insert: '\t' });
+      ops.push({insert: '\t'});
       inParagraph = true;
     } else {
-      ops.push({ insert: ' ' });
+      ops.push({insert: ' '});
     }
 
     ops.push(...parseInline(lineText));
   }
 
   if (inParagraph) {
-    ops.push({ insert: '\n' });
+    ops.push({insert: '\n'});
   }
 
   return ops;
@@ -115,5 +115,5 @@ export function markdownToQuillDelta(text: string): Op[] {
 
 /** Returns a serialised Quill Delta JSON string ready for storage or postMessage. */
 export function markdownToDeltaJson(text: string): string {
-  return JSON.stringify({ ops: markdownToQuillDelta(text) });
+  return JSON.stringify({ops: markdownToQuillDelta(text)});
 }

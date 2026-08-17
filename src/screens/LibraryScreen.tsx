@@ -68,9 +68,12 @@ export default function LibraryScreen({navigation}: Props) {
   // Filter + sort
   const visible = documents
     .filter(d => {
-      if (starredOnly && !d.starred) return false;
-      if (query && !d.title.toLowerCase().includes(query.toLowerCase()))
+      if (starredOnly && !d.starred) {
         return false;
+      }
+      if (query && !d.title.toLowerCase().includes(query.toLowerCase())) {
+        return false;
+      }
       return true;
     })
     .sort((a, b) => {
@@ -122,7 +125,9 @@ export default function LibraryScreen({navigation}: Props) {
   }
 
   async function handleExport(doc: Document) {
-    if (exportingId) return;
+    if (exportingId) {
+      return;
+    }
     setExportingId(doc.id);
     try {
       await exportAndShareDocx(doc.title, doc.content);
