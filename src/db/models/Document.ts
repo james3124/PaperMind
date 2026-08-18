@@ -25,6 +25,8 @@ export default class Document extends Model {
   @field('word_count') wordCount!: number;
   @field('citation_style') citationStyle!: string;
   @field('citation_edition') citationEdition!: string;
+  @field('sources_json') sourcesJson!: string;
+  @field('chat_json') chatJson!: string;
   @field('status') status!: DocumentStatus;
   @field('starred') starred!: boolean;
   @readonly @date('created_at') createdAt!: Date;

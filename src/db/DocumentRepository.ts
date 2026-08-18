@@ -1,6 +1,7 @@
 import {Q} from '@nozbe/watermelondb';
 import {database} from './database';
 import Document, {DocumentStatus} from './models/Document';
+import {SourcePaper} from '@/services/literatureSearch';
 
 const collection = database.get<Document>('documents');
 
@@ -28,6 +29,8 @@ export const documentRepository = {
         doc.wordCount = 0;
         doc.citationStyle = options.citationStyle ?? 'apa';
         doc.citationEdition = options.citationEdition ?? '7th';
+        doc.sourcesJson = '';
+        doc.chatJson = '';
         doc.status = 'draft';
         doc.starred = false;
         doc.updatedAt = new Date();
@@ -43,6 +46,8 @@ export const documentRepository = {
       wordCount: number;
       citationStyle: string;
       citationEdition: string;
+      sourcesJson: string;
+      chatJson: string;
       status: DocumentStatus;
       starred: boolean;
     }>,
@@ -65,6 +70,12 @@ export const documentRepository = {
         if (changes.citationEdition !== undefined) {
           d.citationEdition = changes.citationEdition;
         }
+        if (changes.sourcesJson !== undefined) {
+          d.sourcesJson = changes.sourcesJson;
+        }
+        if (changes.chatJson !== undefined) {
+          d.chatJson = changes.chatJson;
+        }
         if (changes.status !== undefined) {
           d.status = changes.status;
         }
@@ -85,11 +96,21 @@ export const documentRepository = {
         doc.wordCount = original.wordCount;
         doc.citationStyle = original.citationStyle;
         doc.citationEdition = original.citationEdition;
+        doc.sourcesJson = original.sourcesJson;
+        doc.chatJson = original.chatJson;
         doc.status = 'draft';
         doc.starred = false;
         doc.updatedAt = new Date();
       });
     });
+  },
+
+  async updateSources(id: string, sources: SourcePaper[]): Promise<void> {
+    await this.update(id, {sourcesJson: JSON.stringify(sources)});
+  },
+
+  async updateChat(id: string, messages: unknown[]): Promise<void> {
+    await this.update(id, {chatJson: JSON.stringify(messages)});
   },
 
   async delete(id: string): Promise<void> {
