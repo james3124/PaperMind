@@ -324,17 +324,33 @@ export function rankPapers(
   return scored.sort((a, b) => b.score - a.score).map(s => s.paper);
 }
 
+export type SourceKey = 'crossref' | 'openalex' | 'semanticscholar' | 'arxiv';
+
+const ALL_SOURCES: SourceKey[] = [
+  'crossref',
+  'openalex',
+  'semanticscholar',
+  'arxiv',
+];
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export async function searchLiterature(
   topic: string,
   researchQuestions: string[] = [],
+  enabledSources: SourceKey[] = ALL_SOURCES,
 ): Promise<SourcePaper[]> {
   const results = await Promise.allSettled([
-    fetchCrossRef(topic),
-    fetchOpenAlex(topic),
-    fetchSemanticScholar(topic),
-    fetchArXiv(topic),
+    enabledSources.includes('crossref')
+      ? fetchCrossRef(topic)
+      : Promise.resolve([]),
+    enabledSources.includes('openalex')
+      ? fetchOpenAlex(topic)
+      : Promise.resolve([]),
+    enabledSources.includes('semanticscholar')
+      ? fetchSemanticScholar(topic)
+      : Promise.resolve([]),
+    enabledSources.includes('arxiv') ? fetchArXiv(topic) : Promise.resolve([]),
   ]);
 
   const allPapers: SourcePaper[] = [];

@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 import {
   tokenise,
   jaccardSimilarity,
@@ -5,7 +7,11 @@ import {
   deduplicate,
   rankPapers,
   SourcePaper,
+  searchLiterature,
 } from '../literatureSearch';
+
+jest.mock('axios');
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 // ── tokenise ──────────────────────────────────────────────────────────────────
 
@@ -210,7 +216,67 @@ describe('rankPapers', () => {
 describe('searchLiterature shape', () => {
   // We don't make real network calls in tests — just verify the export exists
   it('exports searchLiterature function', async () => {
-    const {searchLiterature} = require('../literatureSearch');
     expect(typeof searchLiterature).toBe('function');
+  });
+});
+
+// ── searchLiterature source selection ────────────────────────────────────────
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockedAxios.get.mockImplementation((url: string) => {
+    if (String(url).includes('crossref')) {
+      return Promise.resolve({
+        data: {
+          message: {
+            items: [
+              {
+                title: ['Only crossref result'],
+                author: [{family: 'Smith', given: 'John'}],
+                published: {'date-parts': [[2020]]},
+              },
+            ],
+          },
+        },
+      });
+    }
+    if (String(url).includes('arxiv')) {
+      return Promise.resolve({
+        data: `<?xml version="1.0"?><feed><entry><title>Only arxiv result</title><id>http://arxiv.org/abs/2001.00001v1</id><published>2020-01-01T00:00:00Z</published><summary>Some abstract</summary><author><name>Jane Doe</name></author></entry></feed>`,
+      });
+    }
+    return Promise.resolve({data: {results: []}}); // openalex
+    // semanticscholar would return {data: {data: []}} — never reached when disabled
+  });
+});
+
+describe('searchLiterature source selection', () => {
+  it('searches only enabled sources', async () => {
+    const results = await searchLiterature(
+      'test topic',
+      [],
+      ['crossref', 'arxiv'],
+    );
+    const calledUrls = mockedAxios.get.mock.calls.map(c => String(c[0]));
+    expect(calledUrls.some(u => u.includes('api.semanticscholar.org'))).toBe(
+      false,
+    );
+    expect(calledUrls.some(u => u.includes('api.openalex.org'))).toBe(false);
+    expect(results.map(r => r.title)).toEqual([
+      'Only crossref result',
+      'Only arxiv result',
+    ]);
+  });
+
+  it('uses all sources by default', async () => {
+    mockedAxios.get.mockResolvedValue({data: {results: []}});
+    await searchLiterature('topic');
+    const calledUrls = mockedAxios.get.mock.calls.map(c => String(c[0]));
+    expect(calledUrls.some(u => u.includes('api.crossref.org'))).toBe(true);
+    expect(calledUrls.some(u => u.includes('api.openalex.org'))).toBe(true);
+    expect(calledUrls.some(u => u.includes('api.semanticscholar.org'))).toBe(
+      true,
+    );
+    expect(calledUrls.some(u => u.includes('export.arxiv.org'))).toBe(true);
   });
 });
