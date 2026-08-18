@@ -4,6 +4,8 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
+  Modal,
   FlatList,
   StyleSheet,
   Alert,
@@ -165,9 +167,17 @@ export default function LibraryScreen({navigation}: Props) {
         </View>
       </View>
 
-      {/* Sort menu */}
-      {showSortMenu && (
+      {/* Sort menu — Modal so tap-outside dismisses it */}
+      <Modal
+        visible={showSortMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSortMenu(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowSortMenu(false)}>
+          <View style={styles.sortBackdrop} />
+        </TouchableWithoutFeedback>
         <View style={styles.sortMenu}>
+          <Text style={styles.sortMenuTitle}>Sort by</Text>
           {(Object.keys(SORT_LABELS) as SortOption[]).map(s => (
             <TouchableOpacity
               key={s}
@@ -183,10 +193,11 @@ export default function LibraryScreen({navigation}: Props) {
                 ]}>
                 {SORT_LABELS[s]}
               </Text>
+              {sort === s && <Text style={styles.sortCheck}>✓</Text>}
             </TouchableOpacity>
           ))}
         </View>
-      )}
+      </Modal>
 
       {/* Offline banner */}
       {isOffline && (
@@ -279,29 +290,48 @@ const styles = StyleSheet.create({
   headerActions: {flexDirection: 'row', alignItems: 'center', gap: 8},
   headerBtn: {padding: 6},
   headerBtnText: {fontSize: 20},
+  sortBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
   sortMenu: {
     position: 'absolute',
     top: 60,
     right: 16,
-    zIndex: 100,
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#e5e7eb',
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
+    minWidth: 200,
+    overflow: 'hidden',
+  },
+  sortMenuTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#9ca3af',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 6,
   },
   sortItem: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
   },
-  sortItemActive: {backgroundColor: '#eef2ff'},
-  sortItemText: {fontSize: 14, color: '#374151'},
+  sortItemActive: {backgroundColor: '#fafafe'},
+  sortItemText: {fontSize: 15, color: '#374151'},
   sortItemTextActive: {color: '#6366f1', fontWeight: '600'},
+  sortCheck: {fontSize: 14, color: '#6366f1', fontWeight: '700'},
   offlineBanner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
