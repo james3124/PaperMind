@@ -515,13 +515,13 @@ function authorText(paper: SourcePaper, style: string): string {
       const formatted =
         authors.length > 6
           ? [
-              `${familyName(authors[0])}${givenInitials(authors[0])
+              `${familyName(authors[0])} ${givenInitials(authors[0])
                 .replace(/\./g, '')
                 .replace(/ /g, '')} et al.`,
             ]
           : authors.map(
               a =>
-                `${familyName(a)}${givenInitials(a)
+                `${familyName(a)} ${givenInitials(a)
                   .replace(/\./g, '')
                   .replace(/ /g, '')}`,
             );
@@ -642,7 +642,7 @@ git commit -m "feat: deterministic citation markers and reference formatting"
 
 **Interfaces:**
 - Produces:
-  - `buildReferencesEntries(sources: SourcePaper[], style: string, edition: string): string[]` — one entry per source, numbered `1. …`, `2. …` etc.
+  - `buildReferencesEntries(sources: SourcePaper[], style: string, edition: string): string[]` — one entry per source. Numbering: styles whose `formatReference` already carries a leading marker (`ieee` → `[n] …`, `vancouver` → `n. …`) get NO extra prefix; all other styles get a `1. ` / `2. ` prefix.
   - `buildReferencesMarkdown(entries: string[]): string` — `'## References\n\n' + entries.join('\n')` (the `## References` header is converted to a bold H2 by `markdownToQuillDelta` since `references` is in `SECTION_HEADERS`).
 
 - [ ] **Step 1: Write the failing tests**
@@ -717,14 +717,17 @@ Expected: FAIL — module doesn't exist.
 import {SourcePaper} from './literatureSearch';
 import {formatReference} from './citationFormat';
 
+const SELF_NUMBERED_STYLES = new Set(['ieee', 'vancouver']);
+
 export function buildReferencesEntries(
   sources: SourcePaper[],
   style: string,
   edition: string,
 ): string[] {
-  return sources.map(
-    (paper, i) => `${i + 1}. ${formatReference(paper, style, edition, i + 1)}`,
-  );
+  return sources.map((paper, i) => {
+    const entry = formatReference(paper, style, edition, i + 1);
+    return SELF_NUMBERED_STYLES.has(style) ? entry : `${i + 1}. ${entry}`;
+  });
 }
 
 export function buildReferencesMarkdown(entries: string[]): string {
