@@ -276,21 +276,21 @@ export default function EditorScreen({route, navigation}: Props) {
           {role: 'system' as const, content: systemPrompt},
           ...history.map(m => ({role: m.role, content: m.content})),
         ];
+        let accumulated = '';
         stream(messages, token => {
+          accumulated += token;
           setChatStreaming(prev => prev + token);
         })
           .then(() => {
-            setChatStreaming(current => {
-              const assistantMsg: ChatMessage = {
-                role: 'assistant',
-                content: current,
-                createdAt: Date.now(),
-              };
-              const withAssistant = [...next, assistantMsg];
-              setChatMessages(withAssistant);
-              saveChat(withAssistant);
-              return '';
-            });
+            const assistantMsg: ChatMessage = {
+              role: 'assistant',
+              content: accumulated,
+              createdAt: Date.now(),
+            };
+            const withAssistant = [...next, assistantMsg];
+            setChatMessages(withAssistant);
+            saveChat(withAssistant);
+            setChatStreaming('');
             setChatBusy(false);
           })
           .catch(e => {
