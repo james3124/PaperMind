@@ -518,7 +518,11 @@ export default function EditorScreen({route, navigation}: Props) {
 
       <CitationPickerModal
         visible={replaceIndex !== null}
-        current={sources[replaceIndex] ?? ({} as SourcePaper)}
+        current={
+          replaceIndex !== null
+            ? sources[replaceIndex] ?? ({} as SourcePaper)
+            : ({} as SourcePaper)
+        }
         enabledSources={enabledSources}
         onToggleSource={(key: SourceKey) =>
           useSettingsStore
