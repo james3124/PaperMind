@@ -34,6 +34,8 @@ export default function ProgressScreen({route, navigation}: Props) {
   const [completed, setCompleted] = useState(false);
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [fatalError, setFatalError] = useState<string | null>(null);
+  const [runKey, setRunKey] = useState(0);
+  const [failedWithCloud, setFailedWithCloud] = useState(false);
 
   const completedCount = completedStages.size;
   const progress = completedCount / STAGE_LABELS.length;
@@ -53,6 +55,7 @@ export default function ProgressScreen({route, navigation}: Props) {
     let cancelled = false;
 
     async function run() {
+      setFailedWithCloud(false);
       const provider = useSettingsStore.getState().provider;
       const needsLocal =
         provider === 'local' ||
@@ -88,6 +91,10 @@ export default function ProgressScreen({route, navigation}: Props) {
           case 'error':
             if (event.fatal) {
               setFatalError(event.message ?? 'Unknown error');
+              setFailedWithCloud(
+                useSettingsStore.getState().provider === 'cloud' ||
+                  (event.message ?? '').toLowerCase().includes('cloud'),
+              );
               return;
             }
             setErrors(prev => [...prev, event.message ?? 'Unknown error']);
@@ -117,6 +124,7 @@ export default function ProgressScreen({route, navigation}: Props) {
     params.citationEdition,
     params.sources,
     params.enabledSources,
+    runKey,
   ]);
 
   if (fatalError) {
@@ -124,6 +132,21 @@ export default function ProgressScreen({route, navigation}: Props) {
       <View style={styles.errorContainer}>
         <Text style={styles.errorTitle}>Generation Failed</Text>
         <Text style={styles.errorMessage}>{fatalError}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => setRunKey(k => k + 1)}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+        {failedWithCloud && (
+          <TouchableOpacity
+            style={[styles.retryButton, styles.localButton]}
+            onPress={() => {
+              useSettingsStore.getState().setProvider('local');
+              setRunKey(k => k + 1);
+            }}>
+            <Text style={styles.retryText}>Use on-device model instead</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.retryButton}
           onPress={() => navigation.goBack()}>
@@ -269,5 +292,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   retryButton: {backgroundColor: '#f3f4f6', padding: 14, borderRadius: 10},
+  localButton: {backgroundColor: '#eef2ff'},
   retryText: {fontWeight: '600', color: '#374151'},
 });
