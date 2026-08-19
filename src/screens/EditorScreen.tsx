@@ -13,7 +13,7 @@ import {
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '@/navigation/AppNavigator';
 import {documentRepository} from '@/db/DocumentRepository';
-import {complete} from '@/services/inference';
+import {complete, stream} from '@/services/inference';
 import {useSettingsStore} from '@/stores/settingsStore';
 import {useModelDownloadStore} from '@/stores/modelDownloadStore';
 import {exportAndShareDocx} from '@/services/exportContent';
@@ -24,9 +24,15 @@ import StyleBar from '@/components/editor/StyleBar';
 import OutlinePanel from '@/components/editor/OutlinePanel';
 import FindReplaceBar from '@/components/editor/FindReplaceBar';
 import AiPanel from '@/components/editor/AiPanel';
+import ChatPanel from '@/components/editor/ChatPanel';
 import CitationManagerModal from '@/components/editor/CitationManagerModal';
 import CitationPickerModal from '@/components/editor/CitationPickerModal';
 import {formatMarker} from '@/services/citationFormat';
+import {
+  ChatMessage,
+  buildSystemPrompt,
+  trimMessages,
+} from '@/services/chatService';
 import {buildReferencesEntries} from '@/services/referencesService';
 import {SourcePaper, SourceKey} from '@/services/literatureSearch';
 import ColorPaletteModal, {
@@ -69,7 +75,10 @@ export default function EditorScreen({route, navigation}: Props) {
   const [citationStyle, setCitationStyle] = useState('apa');
   const [citationEdition, setCitationEdition] = useState('7th');
   const [showCitations, setShowCitations] = useState(false);
-  const [_showChat, setShowChat] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatStreaming, setChatStreaming] = useState('');
+  const [chatBusy, setChatBusy] = useState(false);
   const [replaceIndex, setReplaceIndex] = useState<number | null>(null);
 
   const paperSize = useSettingsStore(s => s.paperSize);
@@ -90,6 +99,14 @@ export default function EditorScreen({route, navigation}: Props) {
         }
         setCitationStyle(doc.citationStyle || 'apa');
         setCitationEdition(doc.citationEdition || '7th');
+        try {
+          const parsed = JSON.parse(doc.chatJson || '[]');
+          if (Array.isArray(parsed)) {
+            setChatMessages(parsed);
+          }
+        } catch {
+          setChatMessages([]);
+        }
       }
     });
   }, [documentId]);
@@ -217,6 +234,81 @@ export default function EditorScreen({route, navigation}: Props) {
       await documentRepository.updateSources(documentId, next);
     },
     [replaceIndex, sources, citationStyle, citationEdition, documentId],
+  );
+
+  const saveChat = useCallback(
+    (messages: ChatMessage[]) => {
+      void documentRepository.updateChat(documentId, messages);
+    },
+    [documentId],
+  );
+
+  const handleChatSend = useCallback(
+    (text: string) => {
+      const userMsg: ChatMessage = {
+        role: 'user',
+        content: text,
+        createdAt: Date.now(),
+      };
+      const next = [...chatMessages, userMsg];
+      setChatMessages(next);
+      saveChat(next);
+      setChatStreaming('');
+      setChatBusy(true);
+
+      editorRef.current?.getContent(delta => {
+        const paperText = extractPlainText(delta);
+        const systemPrompt = buildSystemPrompt(
+          paperText,
+          sources,
+          citationStyle,
+          citationEdition,
+        );
+        const history = trimMessages(next);
+        const messages = [
+          {role: 'system' as const, content: systemPrompt},
+          ...history.map(m => ({role: m.role, content: m.content})),
+        ];
+        stream(messages, token => {
+          setChatStreaming(prev => prev + token);
+        })
+          .then(() => {
+            setChatStreaming(current => {
+              const assistantMsg: ChatMessage = {
+                role: 'assistant',
+                content: current,
+                createdAt: Date.now(),
+              };
+              const withAssistant = [...next, assistantMsg];
+              setChatMessages(withAssistant);
+              saveChat(withAssistant);
+              return '';
+            });
+            setChatBusy(false);
+          })
+          .catch(e => {
+            setChatStreaming('');
+            setChatBusy(false);
+            Alert.alert(
+              'Chat error',
+              e instanceof Error ? e.message : 'Unknown error',
+            );
+          });
+      });
+    },
+    [chatMessages, saveChat, sources, citationStyle, citationEdition],
+  );
+
+  const handleChatApply = useCallback(
+    (message: ChatMessage) => {
+      editorRef.current?.insertDelta(markdownToDeltaJson(message.content));
+      const next = chatMessages.map(m =>
+        m === message ? {...m, applied: true} : m,
+      );
+      setChatMessages(next);
+      saveChat(next);
+    },
+    [chatMessages, saveChat],
   );
 
   const handleInsertImage = useCallback(async () => {
@@ -441,6 +533,16 @@ export default function EditorScreen({route, navigation}: Props) {
         }
         onPick={handleSwapSource}
         onDismiss={() => setReplaceIndex(null)}
+      />
+
+      <ChatPanel
+        visible={showChat}
+        messages={chatMessages}
+        streamingText={chatStreaming}
+        busy={chatBusy}
+        onSend={handleChatSend}
+        onApply={handleChatApply}
+        onDismiss={() => setShowChat(false)}
       />
     </SafeAreaView>
   );
