@@ -1,5 +1,10 @@
-import {complete, stream} from './llamaService';
-import {searchLiterature, SourcePaper} from './literatureSearch';
+import {complete, stream} from './inference';
+import {searchLiterature, SourcePaper, SourceKey} from './literatureSearch';
+import {
+  buildReferencesEntries,
+  buildReferencesMarkdown,
+} from './referencesService';
+import {formatMarker} from './citationFormat';
 import {documentRepository} from '@/db/DocumentRepository';
 import {markdownToDeltaJson} from '@/utils/markdownToQuillDelta';
 
@@ -12,6 +17,8 @@ export interface PipelineConfig {
   paperLength: 'short' | 'standard' | 'long';
   citationStyle: string;
   citationEdition: string;
+  sources?: SourcePaper[];
+  enabledSources?: SourceKey[];
 }
 
 export type PipelineEventType =
@@ -92,19 +99,19 @@ const WORD_TARGETS: Record<
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatSources(sources: SourcePaper[]): string {
+function formatSources(
+  sources: SourcePaper[],
+  style: string,
+  _edition: string,
+): string {
   return sources
-    .map(
-      (s, i) =>
-        `${i + 1}. ${s.authors.slice(0, 3).join(', ')} (${s.year}). ${
-          s.title
-        }. ${s.abstract.slice(0, 200)}…`,
-    )
+    .map((s, i) => {
+      const marker = formatMarker(s, style, i + 1);
+      return `${i + 1}. ${marker} — ${s.authors.slice(0, 3).join(', ')} (${
+        s.year
+      }). ${s.title}. ${s.abstract.slice(0, 200)}…`;
+    })
     .join('\n');
-}
-
-function formatSourcesForReferences(sources: SourcePaper[]): string {
-  return sources.map(s => JSON.stringify(s)).join('\n');
 }
 
 function stageEvent(
@@ -248,10 +255,20 @@ Citation style: ${citStyle}
 Research type: ${config.researchType}
 
 Real academic sources (cite these — do not invent citations):
-${formatSources(sources)}
+${formatSources(sources, config.citationStyle, config.citationEdition)}
 
 Write the ${SECTION_NAMES[key]} section.
-Use ${citStyle} in-text citations where appropriate, citing only the sources listed above.`;
+Use ONLY the exact in-text citation markers shown above (e.g. ${formatMarker(
+    sources[0] ?? {
+      title: '',
+      authors: ['Unknown'],
+      year: 0,
+      abstract: '',
+      source: 'crossref',
+    },
+    config.citationStyle,
+    1,
+  )}), verbatim, citing only the sources listed above.`;
 
   const tokens: string[] = [];
   await stream(
@@ -271,43 +288,30 @@ Use ${citStyle} in-text citations where appropriate, citing only the sources lis
 
 // ── Batch 3: Polish ───────────────────────────────────────────────────────────
 
-interface AbstractAndReferences {
+interface AbstractOnly {
   abstract: string;
-  references: string;
 }
 
-async function runAbstractAndReferences(
+async function runAbstract(
   config: PipelineConfig,
   plan: PaperPlan,
   draft: string,
-  sources: SourcePaper[],
-): Promise<AbstractAndReferences> {
+): Promise<string> {
   const draftSlice = draft.slice(0, 1200);
-  const sourcesSlice = sources.slice(0, 5);
-
   const prompt = `Given the following research paper draft:
 
 ${draftSlice}
 
-Real sources used:
-${formatSourcesForReferences(sourcesSlice)}
-
-1. Write a structured abstract (150–250 words) covering: background, objective, methods, results, conclusion.
-2. Generate a complete References section using ONLY the provided real sources.
-   Format in ${config.citationStyle.toUpperCase()} ${
-    config.citationEdition
-  } style.
-   Sort alphabetically by first author last name.
+Write a structured abstract (150–250 words) covering: background, objective, methods, results, conclusion.
 
 Return ONLY valid JSON — no markdown:
-{ "abstract": "...", "references": "..." }`;
+{ "abstract": "..." }`;
 
   const raw = await complete([{role: 'user', content: prompt}], 0.3, 1024);
-
   try {
-    return JSON.parse(raw) as AbstractAndReferences;
+    return (JSON.parse(raw) as AbstractOnly).abstract ?? '';
   } catch {
-    return {abstract: '', references: ''};
+    return '';
   }
 }
 
@@ -373,7 +377,15 @@ export async function* runPipeline(
   yield stageEvent(5, 'stage-start');
   let sources: SourcePaper[] = [];
   try {
-    sources = await searchLiterature(config.topic, plan.researchQuestions);
+    if (config.sources && config.sources.length > 0) {
+      sources = config.sources;
+    } else {
+      sources = await searchLiterature(
+        config.topic,
+        plan.researchQuestions,
+        config.enabledSources,
+      );
+    }
     yield {type: 'sources-found', count: sources.length};
   } catch {
     yield {
@@ -420,18 +432,13 @@ export async function* runPipeline(
   yield stageEvent(13, 'stage-start');
   yield stageEvent(14, 'stage-start');
 
-  let abstractAndRefs: AbstractAndReferences = {abstract: '', references: ''};
+  let abstractText = '';
   try {
-    abstractAndRefs = await runAbstractAndReferences(
-      config,
-      plan,
-      draft,
-      sources,
-    );
+    abstractText = await runAbstract(config, plan, draft);
   } catch (e: unknown) {
     yield {
       type: 'error',
-      message: `Abstract/references failed: ${
+      message: `Abstract generation failed: ${
         e instanceof Error ? e.message : String(e)
       }`,
       fatal: false,
@@ -466,16 +473,23 @@ export async function* runPipeline(
 
   // Assemble full paper as plain text first (for word count).
   // Use the proofread draft — falls back to raw draft if proofreading failed.
+  const referencesMarkdown = buildReferencesMarkdown(
+    buildReferencesEntries(
+      sources,
+      config.citationStyle,
+      config.citationEdition,
+    ),
+  );
+
   const fullPaperText = [
     plan.title,
     '',
     'Abstract',
-    abstractAndRefs.abstract,
+    abstractText,
     '',
     polishedDraft,
     '',
-    'References',
-    abstractAndRefs.references,
+    referencesMarkdown,
   ].join('\n\n');
 
   // Convert to Quill Delta JSON — fixes ** markers, section headers bold,
@@ -497,6 +511,7 @@ export async function* runPipeline(
     const doc = await documentRepository.create(plan.title, {
       citationStyle: config.citationStyle,
       citationEdition: config.citationEdition,
+      sourcesJson: JSON.stringify(sources),
     });
     await documentRepository.update(doc.id, {
       content: fullPaperDelta, // ← saved as Quill Delta JSON

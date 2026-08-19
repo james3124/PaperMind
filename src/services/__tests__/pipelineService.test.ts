@@ -15,6 +15,10 @@ jest.mock('@/db/DocumentRepository', () => ({
 }));
 
 import {STAGE_LABELS, PipelineConfig} from '../pipelineService';
+import {
+  buildReferencesEntries,
+  buildReferencesMarkdown,
+} from '../referencesService';
 
 describe('STAGE_LABELS', () => {
   it('has exactly 19 stages', () => {
@@ -55,4 +59,23 @@ describe('PipelineConfig type shape', () => {
     expect(config.researchType).toBe('quantitative');
     expect(config.paperLength).toBe('standard');
   });
+});
+
+it('references are built deterministically, not by the LLM', () => {
+  const sources = [
+    {
+      title: 'Mobile learning',
+      authors: ['Smith, J.'],
+      year: 2020,
+      abstract: '',
+      doi: '10.1000/xyz',
+      url: 'https://doi.org/10.1000/xyz',
+      source: 'crossref' as const,
+    },
+  ];
+  const entries = buildReferencesEntries(sources, 'apa', '7th');
+  const md = buildReferencesMarkdown(entries);
+  expect(md).toContain('## References');
+  expect(md).toContain('Smith, J. (2020). Mobile learning.');
+  expect(md).not.toContain('undefined');
 });

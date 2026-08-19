@@ -20,7 +20,11 @@ export const documentRepository = {
 
   async create(
     title: string,
-    options: Partial<{citationStyle: string; citationEdition: string}> = {},
+    options: Partial<{
+      citationStyle: string;
+      citationEdition: string;
+      sourcesJson: string;
+    }> = {},
   ): Promise<Document> {
     return await database.write(async () => {
       return await collection.create(doc => {
@@ -29,7 +33,7 @@ export const documentRepository = {
         doc.wordCount = 0;
         doc.citationStyle = options.citationStyle ?? 'apa';
         doc.citationEdition = options.citationEdition ?? '7th';
-        doc.sourcesJson = '';
+        doc.sourcesJson = options.sourcesJson ?? '';
         doc.chatJson = '';
         doc.status = 'draft';
         doc.starred = false;
