@@ -24,6 +24,11 @@ import StyleBar from '@/components/editor/StyleBar';
 import OutlinePanel from '@/components/editor/OutlinePanel';
 import FindReplaceBar from '@/components/editor/FindReplaceBar';
 import AiPanel from '@/components/editor/AiPanel';
+import CitationManagerModal from '@/components/editor/CitationManagerModal';
+import CitationPickerModal from '@/components/editor/CitationPickerModal';
+import {formatMarker} from '@/services/citationFormat';
+import {buildReferencesEntries} from '@/services/referencesService';
+import {SourcePaper, SourceKey} from '@/services/literatureSearch';
 import ColorPaletteModal, {
   ColorKind,
 } from '@/components/editor/ColorPaletteModal';
@@ -60,6 +65,13 @@ export default function EditorScreen({route, navigation}: Props) {
   const [showLink, setShowLink] = useState(false);
   const [showTable, setShowTable] = useState(false);
 
+  const [sources, setSources] = useState<SourcePaper[]>([]);
+  const [citationStyle, setCitationStyle] = useState('apa');
+  const [citationEdition, setCitationEdition] = useState('7th');
+  const [showCitations, setShowCitations] = useState(false);
+  const [_showChat, setShowChat] = useState(false);
+  const [replaceIndex, setReplaceIndex] = useState<number | null>(null);
+
   const paperSize = useSettingsStore(s => s.paperSize);
   const setPaperSize = useSettingsStore(s => s.setPaperSize);
   const modelReady = useModelDownloadStore(s => s.modelReady);
@@ -70,6 +82,13 @@ export default function EditorScreen({route, navigation}: Props) {
         setTitle(doc.title);
         setContent(doc.content);
         setWordCount(doc.wordCount);
+        try {
+          setSources(JSON.parse(doc.sourcesJson || '[]'));
+        } catch {
+          setSources([]);
+        }
+        setCitationStyle(doc.citationStyle || 'apa');
+        setCitationEdition(doc.citationEdition || '7th');
       }
     });
   }, [documentId]);
@@ -173,6 +192,31 @@ export default function EditorScreen({route, navigation}: Props) {
       }
     });
   }, [exporting, title]);
+
+  const handleSwapSource = useCallback(
+    async (paper: SourcePaper) => {
+      if (replaceIndex === null) {
+        return;
+      }
+      const oldPaper = sources[replaceIndex];
+      const next = [...sources];
+      next[replaceIndex] = paper;
+      setSources(next);
+      setReplaceIndex(null);
+      if (oldPaper) {
+        editorRef.current?.replaceCitationMarkers(
+          replaceIndex + 1,
+          formatMarker(oldPaper, citationStyle, replaceIndex + 1),
+          formatMarker(paper, citationStyle, replaceIndex + 1),
+        );
+      }
+      editorRef.current?.replaceReferences(
+        buildReferencesEntries(next, citationStyle, citationEdition),
+      );
+      await documentRepository.updateSources(documentId, next);
+    },
+    [replaceIndex, sources, citationStyle, citationEdition, documentId],
+  );
 
   const handleInsertImage = useCallback(async () => {
     try {
@@ -278,6 +322,8 @@ export default function EditorScreen({route, navigation}: Props) {
         onInsertPageBreak={() => editorRef.current?.insertPageBreak()}
         onOpenLink={() => setShowLink(true)}
         onAiAction={() => setShowAi(true)}
+        onCitations={() => setShowCitations(true)}
+        onChat={() => setShowChat(true)}
         wordCount={wordCount}
       />
 
@@ -366,6 +412,34 @@ export default function EditorScreen({route, navigation}: Props) {
         visible={showTable}
         onInsert={(rows, cols) => editorRef.current?.insertTable(rows, cols)}
         onDismiss={() => setShowTable(false)}
+      />
+
+      <CitationManagerModal
+        visible={showCitations}
+        sources={sources}
+        style={citationStyle}
+        edition={citationEdition}
+        onReplace={index => setReplaceIndex(index)}
+        onDismiss={() => setShowCitations(false)}
+      />
+
+      <CitationPickerModal
+        visible={replaceIndex !== null}
+        current={sources[replaceIndex] ?? ({} as SourcePaper)}
+        enabledSources={useSettingsStore.getState().enabledSources}
+        onToggleSource={(key: SourceKey) =>
+          useSettingsStore
+            .getState()
+            .setEnabledSources(
+              useSettingsStore.getState().enabledSources.includes(key)
+                ? useSettingsStore
+                    .getState()
+                    .enabledSources.filter(k => k !== key)
+                : [...useSettingsStore.getState().enabledSources, key],
+            )
+        }
+        onPick={handleSwapSource}
+        onDismiss={() => setReplaceIndex(null)}
       />
     </SafeAreaView>
   );

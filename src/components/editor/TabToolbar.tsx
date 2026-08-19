@@ -43,6 +43,8 @@ interface Props {
   onInsertPageBreak: () => void;
   onOpenLink: () => void;
   onAiAction: () => void;
+  onCitations: () => void;
+  onChat: () => void;
   wordCount: number;
 }
 
@@ -63,6 +65,8 @@ export default function TabToolbar({
   onInsertPageBreak,
   onOpenLink,
   onAiAction,
+  onCitations,
+  onChat,
   wordCount,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('Home');
@@ -235,6 +239,8 @@ export default function TabToolbar({
   function renderReferencesTab() {
     return (
       <>
+        <Btn icon="document-text-outline" onPress={onCitations} />
+        <Divider />
         <Btn icon="link" onPress={onOpenLink} />
         <Btn icon="superscript" onPress={() => onFormat('script', 'super')} />
       </>
@@ -244,6 +250,8 @@ export default function TabToolbar({
   function renderReviewTab() {
     return (
       <>
+        <Btn icon="chatbubble-ellipses-outline" onPress={onChat} />
+        <Divider />
         <Btn icon="arrow-undo" onPress={onUndo} />
         <Btn icon="arrow-redo" onPress={onRedo} />
         <Divider />

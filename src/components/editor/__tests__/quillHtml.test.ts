@@ -1,4 +1,4 @@
-import {PAPER_RATIOS} from '@/components/editor/quillHtml';
+import {buildQuillHtml, PAPER_RATIOS} from '@/components/editor/quillHtml';
 
 describe('PAPER_RATIOS', () => {
   it('has expected ratios for all supported paper sizes', () => {
@@ -13,7 +13,6 @@ describe('PAPER_RATIOS', () => {
   });
 
   it('buildQuillHtml injects the paper size and enables 16px font', () => {
-    const {buildQuillHtml} = require('@/components/editor/quillHtml');
     const html = buildQuillHtml('Hello', 'a5');
     expect(html).toContain("applyPaperSize('a5')");
     expect(html).toContain('font-size: 16px');
@@ -21,7 +20,6 @@ describe('PAPER_RATIOS', () => {
   });
 
   it('registers the custom table blot and its CSS', () => {
-    const {buildQuillHtml} = require('@/components/editor/quillHtml');
     const html = buildQuillHtml('');
     expect(html).toContain("PaperTableBlot.blotName = 'paper-table'");
     expect(html).toContain("PaperTableBlot.tagName = 'table'");
@@ -30,7 +28,6 @@ describe('PAPER_RATIOS', () => {
   });
 
   it('registers the page-break blot and its CSS', () => {
-    const {buildQuillHtml} = require('@/components/editor/quillHtml');
     const html = buildQuillHtml('');
     expect(html).toContain("PageBreakBlot.blotName = 'page-break'");
     expect(html).toContain("PageBreakBlot.tagName = 'hr'");
@@ -39,7 +36,6 @@ describe('PAPER_RATIOS', () => {
   });
 
   it('registers the spacing attributor and exposes table/image/pagebreak commands', () => {
-    const {buildQuillHtml} = require('@/components/editor/quillHtml');
     const html = buildQuillHtml('');
     expect(html).toContain('SpacingAttributor');
     expect(html).toContain("case 'insertTable'");
@@ -54,8 +50,20 @@ describe('PAPER_RATIOS', () => {
   });
 
   it('escapes user content before injecting into the template literal', () => {
-    const {buildQuillHtml} = require('@/components/editor/quillHtml');
     const html = buildQuillHtml('cost: $5 and `tick` and \\backslash\\');
     expect(html).toContain('cost: \\$5 and \\`tick\\` and \\\\backslash\\\\');
+  });
+
+  it('embeds replaceCitationMarkers command handler', () => {
+    const html = buildQuillHtml('');
+    expect(html).toContain(`case 'replaceCitationMarkers'`);
+    expect(html).toContain('msg.oldMarker');
+    expect(html).toContain('msg.newMarker');
+  });
+
+  it('embeds replaceReferences command handler', () => {
+    const html = buildQuillHtml('');
+    expect(html).toContain(`case 'replaceReferences'`);
+    expect(html).toContain('msg.entries');
   });
 });

@@ -306,6 +306,50 @@ export function buildQuillHtml(
         case 'deleteTableColumn': deleteTableColumn(); break;
         case 'deleteTable':    deleteTable();    break;
 
+        case 'replaceCitationMarkers': {
+          const text = quill.getText();
+          let idx = 0;
+          while ((idx = text.indexOf(msg.oldMarker, idx)) !== -1) {
+            quill.deleteText(idx, msg.oldMarker.length);
+            quill.insertText(idx, msg.newMarker);
+            idx += msg.newMarker.length;
+          }
+          break;
+        }
+
+        case 'replaceReferences': {
+          const delta = quill.getContents();
+          let refPos = -1;
+          let pos = 0;
+          delta.ops.forEach(op => {
+            if (typeof op.insert === 'string') {
+              const lines = op.insert.split('\\n');
+              lines.forEach((line, li) => {
+                if (
+                  line.trim().toLowerCase() === 'references' &&
+                  op.attributes && op.attributes.header
+                ) {
+                  refPos = pos;
+                }
+                pos += line.length + (li < lines.length - 1 ? 1 : 0);
+              });
+            } else {
+              pos += 1;
+            }
+          });
+          if (refPos === -1) break;
+          const afterHeader = refPos + 'References'.length + 1;
+          const total = quill.getLength();
+          if (afterHeader < total) {
+            quill.deleteText(afterHeader, total - afterHeader);
+          }
+          quill.insertText(
+            afterHeader,
+            '\\n' + (Array.isArray(msg.entries) ? msg.entries : []).join('\\n'),
+          );
+          break;
+        }
+
         case 'setPaperSize':
           applyPaperSize(msg.paperSize);
           break;

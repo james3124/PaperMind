@@ -23,6 +23,12 @@ export interface EditorRef {
   redo: () => void;
   setPaperSize: (paperSize: PaperSize) => void;
   getContent: (onContent: (delta: string) => void) => void;
+  replaceCitationMarkers: (
+    index: number,
+    oldMarker: string,
+    newMarker: string,
+  ) => void;
+  replaceReferences: (entries: string[]) => void;
 }
 
 interface Props {
@@ -74,6 +80,9 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
       pendingGetContent.current = onContent;
       postCmd({cmd: 'getContent'});
     },
+    replaceCitationMarkers: (index, oldMarker, newMarker) =>
+      postCmd({cmd: 'replaceCitationMarkers', index, oldMarker, newMarker}),
+    replaceReferences: entries => postCmd({cmd: 'replaceReferences', entries}),
   }));
 
   function onMessage(event: WebViewMessageEvent) {
