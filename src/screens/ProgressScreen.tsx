@@ -14,6 +14,8 @@ import {
   PipelineConfig,
 } from '@/services/pipelineService';
 import {modelExists} from '@/utils/modelPaths';
+import {isCloudConfigured} from '@/services/cloudService';
+import {useSettingsStore} from '@/stores/settingsStore';
 import StageList from '@/components/generate/StageList';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Progress'>;
@@ -44,12 +46,19 @@ export default function ProgressScreen({route, navigation}: Props) {
       paperLength: params.paperLength as PipelineConfig['paperLength'],
       citationStyle: params.citationStyle,
       citationEdition: params.citationEdition,
+      sources: params.sources,
+      enabledSources: params.enabledSources,
     };
 
     let cancelled = false;
 
     async function run() {
-      if (!(await modelExists())) {
+      const provider = useSettingsStore.getState().provider;
+      const needsLocal =
+        provider === 'local' ||
+        !isCloudConfigured() ||
+        !useSettingsStore.getState().cloudFallbackEnabled;
+      if (needsLocal && !(await modelExists())) {
         setFatalError('AI model is not loaded. Please restart the app.');
         return;
       }
@@ -106,6 +115,8 @@ export default function ProgressScreen({route, navigation}: Props) {
     params.paperLength,
     params.citationStyle,
     params.citationEdition,
+    params.sources,
+    params.enabledSources,
   ]);
 
   if (fatalError) {

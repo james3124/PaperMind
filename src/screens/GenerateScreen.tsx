@@ -78,7 +78,8 @@ export default function GenerateScreen({navigation}: Props) {
     if (!topic.trim()) {
       return;
     }
-    if (!(await modelExists())) {
+    const provider = useSettingsStore.getState().provider;
+    if (provider === 'local' && !(await modelExists())) {
       navigation.navigate('ModelDownload');
       return;
     }
@@ -89,7 +90,7 @@ export default function GenerateScreen({navigation}: Props) {
     setCitation(choice);
     setShowCitation(false);
 
-    navigation.navigate('Progress', {
+    navigation.navigate('CitationReview', {
       topic: context.trim()
         ? `${topic.trim()}\n\nAdditional context: ${context.trim()}`
         : topic.trim(),

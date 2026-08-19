@@ -4,6 +4,7 @@ import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import LibraryScreen from '@/screens/LibraryScreen';
 import ModelDownloadBanner from '@/components/ModelDownloadBanner';
+import type {SourceKey, SourcePaper} from '@/services/literatureSearch';
 
 export type RootStackParamList = {
   Library: undefined;
@@ -15,6 +16,17 @@ export type RootStackParamList = {
     researchType: string;
     academicLevel: string;
     paperLength: string;
+    sources?: SourcePaper[];
+    enabledSources?: SourceKey[];
+  };
+  CitationReview: {
+    topic: string;
+    citationStyle: string;
+    citationEdition: string;
+    researchType: string;
+    academicLevel: string;
+    paperLength: string;
+    context?: string;
   };
   Editor: {documentId: string};
   Settings: undefined;
@@ -29,6 +41,9 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 // React.lazy + Suspense avoids the blank-frame flash caused by mutating
 // a closure variable during render.
 const GenerateScreen = React.lazy(() => import('@/screens/GenerateScreen'));
+const CitationReviewScreen = React.lazy(
+  () => import('@/screens/CitationReviewScreen'),
+);
 const ProgressScreen = React.lazy(() => import('@/screens/ProgressScreen'));
 const EditorScreen = React.lazy(() => import('@/screens/EditorScreen'));
 const SettingsScreen = React.lazy(() => import('@/screens/SettingsScreen'));
@@ -63,6 +78,11 @@ export default function AppNavigator({initialRoute}: Props) {
             name="Generate"
             component={GenerateScreen}
             options={{title: 'New Paper'}}
+          />
+          <Stack.Screen
+            name="CitationReview"
+            component={CitationReviewScreen}
+            options={{title: 'Review Sources'}}
           />
           <Stack.Screen
             name="Progress"
