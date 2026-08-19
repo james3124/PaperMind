@@ -231,7 +231,14 @@ export default function EditorScreen({route, navigation}: Props) {
       editorRef.current?.replaceReferences(
         buildReferencesEntries(next, citationStyle, citationEdition),
       );
-      await documentRepository.updateSources(documentId, next);
+      try {
+        await documentRepository.updateSources(documentId, next);
+      } catch {
+        Alert.alert(
+          'Could not save sources',
+          'The citation changed but the change could not be saved.',
+        );
+      }
     },
     [replaceIndex, sources, citationStyle, citationEdition, documentId],
   );
