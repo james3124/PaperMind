@@ -55,6 +55,7 @@ export default function ProgressScreen({route, navigation}: Props) {
     let cancelled = false;
 
     async function run() {
+      setFatalError(null);
       setFailedWithCloud(false);
       const provider = useSettingsStore.getState().provider;
       const needsLocal =
