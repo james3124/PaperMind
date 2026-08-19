@@ -258,17 +258,11 @@ Real academic sources (cite these — do not invent citations):
 ${formatSources(sources, config.citationStyle, config.citationEdition)}
 
 Write the ${SECTION_NAMES[key]} section.
-Use ONLY the exact in-text citation markers shown above (e.g. ${formatMarker(
-    sources[0] ?? {
-      title: '',
-      authors: ['Unknown'],
-      year: 0,
-      abstract: '',
-      source: 'crossref',
-    },
-    config.citationStyle,
-    1,
-  )}), verbatim, citing only the sources listed above.`;
+Use ONLY the exact in-text citation markers shown above${
+    sources.length > 0
+      ? ` (e.g. ${formatMarker(sources[0], config.citationStyle, 1)})`
+      : ''
+  }, verbatim, citing only the sources listed above.`;
 
   const tokens: string[] = [];
   await stream(
