@@ -13,7 +13,7 @@ import {
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '@/navigation/AppNavigator';
 import {documentRepository} from '@/db/DocumentRepository';
-import {complete} from '@/services/llamaService';
+import {complete} from '@/services/inference';
 import {useSettingsStore} from '@/stores/settingsStore';
 import {useModelDownloadStore} from '@/stores/modelDownloadStore';
 import {exportAndShareDocx} from '@/services/exportContent';
@@ -121,7 +121,8 @@ export default function EditorScreen({route, navigation}: Props) {
 
   const handleAiAction = useCallback(
     async (prompt: string, text: string) => {
-      if (!modelReady) {
+      const provider = useSettingsStore.getState().provider;
+      if (provider === 'local' && !modelReady) {
         Alert.alert(
           'Model not ready',
           'The AI model is still downloading. Please wait.',

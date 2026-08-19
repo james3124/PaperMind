@@ -33,6 +33,24 @@ describe('settingsStore defaults', () => {
   });
 });
 
+describe('cloud provider defaults', () => {
+  it('cloud provider fields default correctly', () => {
+    const {useSettingsStore} = require('../settingsStore');
+    const s = useSettingsStore.getState();
+    expect(s.provider).toBe('local');
+    expect(s.cloudBaseUrl).toBe('https://api.openai.com/v1');
+    expect(s.cloudApiKey).toBe('');
+    expect(s.cloudModel).toBe('gpt-4o-mini');
+    expect(s.cloudFallbackEnabled).toBe(true);
+    expect(s.enabledSources).toEqual([
+      'crossref',
+      'openalex',
+      'semanticscholar',
+      'arxiv',
+    ]);
+  });
+});
+
 describe('modelPaths', () => {
   it('getModelPath includes model filename', () => {
     expect(getModelPath()).toContain('qwen2.5-0.5b-instruct-q8_0.gguf');
