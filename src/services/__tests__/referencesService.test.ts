@@ -1,4 +1,7 @@
-import {buildReferencesEntries, buildReferencesMarkdown} from '../referencesService';
+import {
+  buildReferencesEntries,
+  buildReferencesMarkdown,
+} from '../referencesService';
 import {SourcePaper} from '../literatureSearch';
 
 const a: SourcePaper = {
@@ -30,7 +33,7 @@ it('builds numbered entries in source order', () => {
   expect(entries[1]).toContain('Doe, A., & Roe, B.');
 });
 
-it('entries stay byte-identical when only one entry changes', () => {
+it('entries stay byte-identical when another entry changes', () => {
   const before = buildReferencesEntries([a, b], 'apa', '7th');
   const swapped = buildReferencesEntries(
     [
@@ -44,10 +47,19 @@ it('entries stay byte-identical when only one entry changes', () => {
   expect(swapped[1]).not.toBe(before[1]);
 });
 
-it('builds references markdown with heading', () => {
-  const md = buildReferencesMarkdown(
-    buildReferencesEntries([a], 'apa', '7th'),
+it('does not add a numeric prefix to self-numbered styles', () => {
+  const ieee = buildReferencesEntries([a, b], 'ieee', '');
+  expect(ieee[0]).toBe('[1] J. Smith, "Mobile learning effects," 2020.');
+  expect(ieee[0]).not.toMatch(/^1\. /);
+  const vancouver = buildReferencesEntries([a, b], 'vancouver', '');
+  expect(vancouver[0]).toBe('1. Smith J. Mobile learning effects. 2020.');
+  expect(vancouver[1]).toBe(
+    '2. Doe A, Roe B. Gamification in classrooms. 2019.',
   );
+});
+
+it('builds references markdown with heading', () => {
+  const md = buildReferencesMarkdown(buildReferencesEntries([a], 'apa', '7th'));
   expect(md).toBe(
     '## References\n\n1. Smith, J. (2020). Mobile learning effects. https://doi.org/10.1000/aaa',
   );
