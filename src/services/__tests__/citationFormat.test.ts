@@ -80,6 +80,24 @@ describe('formatReference', () => {
       'Smith, J., & Doe, A. (2020). The impact of mobile learning.',
     );
   });
+  it('mla omits url fragment when neither doi nor url present', () => {
+    const noUrl = {...paper, doi: undefined, url: undefined};
+    expect(formatReference(noUrl, 'mla', '9th', 1)).toBe(
+      'Smith, J., and Doe, A. "The impact of mobile learning." 2020',
+    );
+  });
+  it('chicago omits url fragment when neither doi nor url present', () => {
+    const noUrl = {...paper, doi: undefined, url: undefined};
+    expect(formatReference(noUrl, 'chicago', '17th', 1)).toBe(
+      'Smith, J., and Doe, A. 2020. "The impact of mobile learning."',
+    );
+  });
+  it('harvard omits url fragment when neither doi nor url present', () => {
+    const noUrl = {...paper, doi: undefined, url: undefined};
+    expect(formatReference(noUrl, 'harvard', '', 1)).toBe(
+      'Smith, J., and Doe, A. (2020) The impact of mobile learning.',
+    );
+  });
   it('four authors: apa lists all, mla uses et al.', () => {
     const four = {
       ...paper,

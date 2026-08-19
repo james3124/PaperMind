@@ -130,33 +130,30 @@ export function formatReference(
     : paper.url
     ? paper.url
     : '';
-  const withUrl = (s: string) => (urlPart ? s.replace('{url}', urlPart) : s);
   const title = paper.title;
 
   switch (style) {
     case 'apa': {
       const base = `${authorText(paper, 'apa')} (${paper.year}). ${title}.`;
-      return withUrl(base + (urlPart ? ' {url}' : ''));
+      return base + (urlPart ? ` ${urlPart}` : '');
     }
     case 'mla':
-      return withUrl(
-        `${authorText(paper, 'mla')} "${title}." ${paper.year}, {url}.`,
-      );
+      return `${authorText(paper, 'mla')} "${title}." ${paper.year}${
+        urlPart ? `, ${urlPart}.` : ''
+      }`;
     case 'ieee':
       return `${formatMarker(paper, 'ieee', index)} ${authorText(
         paper,
         'ieee',
       )}, "${title}," ${paper.year}.`;
     case 'chicago':
-      return withUrl(
-        `${authorText(paper, 'chicago')} ${paper.year}. "${title}." {url}.`,
-      );
+      return `${authorText(paper, 'chicago')} ${paper.year}. "${title}."${
+        urlPart ? ` ${urlPart}.` : ''
+      }`;
     case 'harvard':
-      return withUrl(
-        `${authorText(paper, 'harvard')} (${
-          paper.year
-        }) ${title}. Available at: {url}.`,
-      );
+      return `${authorText(paper, 'harvard')} (${paper.year}) ${title}.${
+        urlPart ? ` Available at: ${urlPart}.` : ''
+      }`;
     case 'vancouver':
       return `${index}. ${authorText(paper, 'vancouver')}. ${title}. ${
         paper.year
