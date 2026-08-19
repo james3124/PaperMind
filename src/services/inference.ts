@@ -45,7 +45,10 @@ export async function stream(
       if (!s.cloudFallbackEnabled) {
         throw e;
       }
-      console.warn('[inference] cloud stream failed, falling back to local:', e);
+      console.warn(
+        '[inference] cloud stream failed, falling back to local:',
+        e,
+      );
     }
   }
   await llamaService.stream(messages, onToken, temperature, maxTokens);

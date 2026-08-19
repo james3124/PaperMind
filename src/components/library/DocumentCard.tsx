@@ -23,10 +23,16 @@ interface Props {
 function timeAgo(date: Date): string {
   const diff = Date.now() - date.getTime();
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) {
+    return 'just now';
+  }
+  if (mins < 60) {
+    return `${mins}m ago`;
+  }
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) {
+    return `${hrs}h ago`;
+  }
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
@@ -97,7 +103,10 @@ export default function DocumentCard({
 
   return (
     <>
-      <TouchableOpacity style={styles.card} onPress={onTap} activeOpacity={0.82}>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={onTap}
+        activeOpacity={0.82}>
         {/* Doc icon */}
         <View style={styles.iconWrap}>
           <Text style={styles.iconGlyph}>📄</Text>
@@ -126,7 +135,8 @@ export default function DocumentCard({
           style={styles.iconBtn}
           onPress={onStar}
           hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-          <Text style={[styles.starIcon, document.starred && styles.starActive]}>
+          <Text
+            style={[styles.starIcon, document.starred && styles.starActive]}>
             {document.starred ? '★' : '☆'}
           </Text>
         </TouchableOpacity>

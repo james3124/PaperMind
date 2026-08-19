@@ -68,43 +68,43 @@ export default function AppNavigator({initialRoute}: Props) {
     <View style={styles.root}>
       <NavigationContainer>
         <Suspense fallback={<ScreenFallback />}>
-        <Stack.Navigator initialRouteName={initialRoute}>
-          <Stack.Screen
-            name="Library"
-            component={LibraryScreen}
-            options={{title: 'PaperMind'}}
-          />
-          <Stack.Screen
-            name="Generate"
-            component={GenerateScreen}
-            options={{title: 'New Paper'}}
-          />
-          <Stack.Screen
-            name="CitationReview"
-            component={CitationReviewScreen}
-            options={{title: 'Review Sources'}}
-          />
-          <Stack.Screen
-            name="Progress"
-            component={ProgressScreen}
-            options={{title: 'Generating…', headerBackVisible: false}}
-          />
-          <Stack.Screen
-            name="Editor"
-            component={EditorScreen}
-            options={{headerShown: false}}
-          />
-          <Stack.Screen
-            name="Settings"
-            component={SettingsScreen}
-            options={{title: 'Settings'}}
-          />
-          <Stack.Screen
-            name="ModelDownload"
-            component={ModelDownloadScreen}
-            options={{headerShown: false}}
-          />
-        </Stack.Navigator>
+          <Stack.Navigator initialRouteName={initialRoute}>
+            <Stack.Screen
+              name="Library"
+              component={LibraryScreen}
+              options={{title: 'PaperMind'}}
+            />
+            <Stack.Screen
+              name="Generate"
+              component={GenerateScreen}
+              options={{title: 'New Paper'}}
+            />
+            <Stack.Screen
+              name="CitationReview"
+              component={CitationReviewScreen}
+              options={{title: 'Review Sources'}}
+            />
+            <Stack.Screen
+              name="Progress"
+              component={ProgressScreen}
+              options={{title: 'Generating…', headerBackVisible: false}}
+            />
+            <Stack.Screen
+              name="Editor"
+              component={EditorScreen}
+              options={{headerShown: false}}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={SettingsScreen}
+              options={{title: 'Settings'}}
+            />
+            <Stack.Screen
+              name="ModelDownload"
+              component={ModelDownloadScreen}
+              options={{headerShown: false}}
+            />
+          </Stack.Navigator>
         </Suspense>
       </NavigationContainer>
 
