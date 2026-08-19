@@ -36,7 +36,7 @@
 **Interfaces:**
 - Produces: `Document.sourcesJson: string`, `Document.chatJson: string`; `documentRepository.updateSources(id: string, sources: SourcePaper[]): Promise<void>`; `documentRepository.updateChat(id: string, messages: ChatMessage[]): Promise<void>`; `update(id, changes)` now also accepts `sourcesJson: string`, `chatJson: string`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `src/db/__tests__/DocumentRepository.test.ts`, add:
 
@@ -80,12 +80,12 @@ it('duplicate copies sourcesJson and chatJson', async () => {
 
 Note: `ChatMessage` is not created until Task 11; to keep Task 1 green, define the shape inline as an object literal (no import needed — the test passes plain objects).
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx jest src/db/__tests__/DocumentRepository.test.ts`
 Expected: FAIL — `sourcesJson`/`chatJson` are `undefined` and `updateSources`/`updateChat` don't exist.
 
-- [ ] **Step 3: Implement schema v2 + migration**
+- [x] **Step 3: Implement schema v2 + migration**
 
 `src/db/schema.ts` — bump version and add columns:
 
@@ -136,7 +136,7 @@ export const migrations = schemaMigrations({
 });
 ```
 
-- [ ] **Step 4: Update the Document model**
+- [x] **Step 4: Update the Document model**
 
 `src/db/models/Document.ts` — add after `citation_edition`:
 
@@ -145,7 +145,7 @@ export const migrations = schemaMigrations({
   @field('chat_json') chatJson!: string;
 ```
 
-- [ ] **Step 5: Update the repository**
+- [x] **Step 5: Update the repository**
 
 `src/db/DocumentRepository.ts`:
 - Import `SourcePaper` from `@/services/literatureSearch`.
@@ -174,12 +174,12 @@ export const migrations = schemaMigrations({
   },
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `npx jest src/db/__tests__/DocumentRepository.test.ts`
 Expected: PASS (both new tests + existing ones)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/db/schema.ts src/db/migrations/index.ts src/db/models/Document.ts src/db/DocumentRepository.ts src/db/__tests__/DocumentRepository.test.ts
@@ -197,7 +197,7 @@ git commit -m "feat: add sources_json and chat_json to documents (schema v2)"
 **Interfaces:**
 - Produces: `export type SourceKey = 'crossref' | 'openalex' | 'semanticscholar' | 'arxiv';` and `searchLiterature(topic: string, researchQuestions: string[] = [], enabledSources?: SourceKey[]): Promise<SourcePaper[]>`. When `enabledSources` is undefined, all four are used (backwards compatible).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `src/services/__tests__/literatureSearch.test.ts`:
 
@@ -264,12 +264,12 @@ it('uses all sources by default', async () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx jest src/services/__tests__/literatureSearch.test.ts`
 Expected: FAIL — third parameter is ignored (all sources called regardless).
 
-- [ ] **Step 3: Implement source filtering**
+- [x] **Step 3: Implement source filtering**
 
 In `src/services/literatureSearch.ts`:
 
@@ -304,12 +304,12 @@ export async function searchLiterature(
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npx jest src/services/__tests__/literatureSearch.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/literatureSearch.ts src/services/__tests__/literatureSearch.test.ts
@@ -349,7 +349,7 @@ git commit -m "feat: allow selecting which literature sources to search"
 - `vancouver`: `` `${index}. ${authorsText}. ${title}. ${year}.` `` (authorsText = `Smith J, Doe A`)
 - unknown style: fall back to `apa` rules.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src/services/__tests__/citationFormat.test.ts`:
 
@@ -447,12 +447,12 @@ describe('formatReference', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx jest src/services/__tests__/citationFormat.test.ts`
 Expected: FAIL — module doesn't exist.
 
-- [ ] **Step 3: Implement `citationFormat.ts`**
+- [x] **Step 3: Implement `citationFormat.ts`**
 
 ```ts
 import {SourcePaper} from './literatureSearch';
@@ -620,12 +620,12 @@ export function formatReference(
 
 Note: `vancouverList` and `initialsList` were removed from the final implementation — only `authorText` is used.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npx jest src/services/__tests__/citationFormat.test.ts`
 Expected: PASS. Fix any formatting discrepancies by matching the golden strings exactly.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/citationFormat.ts src/services/__tests__/citationFormat.test.ts
@@ -645,7 +645,7 @@ git commit -m "feat: deterministic citation markers and reference formatting"
   - `buildReferencesEntries(sources: SourcePaper[], style: string, edition: string): string[]` — one entry per source. Numbering: styles whose `formatReference` already carries a leading marker (`ieee` → `[n] …`, `vancouver` → `n. …`) get NO extra prefix; all other styles get a `1. ` / `2. ` prefix.
   - `buildReferencesMarkdown(entries: string[]): string` — `'## References\n\n' + entries.join('\n')` (the `## References` header is converted to a bold H2 by `markdownToQuillDelta` since `references` is in `SECTION_HEADERS`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src/services/__tests__/referencesService.test.ts`:
 
@@ -706,12 +706,12 @@ it('builds references markdown with heading', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx jest src/services/__tests__/referencesService.test.ts`
 Expected: FAIL — module doesn't exist.
 
-- [ ] **Step 3: Implement `referencesService.ts`**
+- [x] **Step 3: Implement `referencesService.ts`**
 
 ```ts
 import {SourcePaper} from './literatureSearch';
@@ -735,12 +735,12 @@ export function buildReferencesMarkdown(entries: string[]): string {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npx jest src/services/__tests__/referencesService.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/referencesService.ts src/services/__tests__/referencesService.test.ts
@@ -764,7 +764,7 @@ git commit -m "feat: deterministic references section builder"
 
 **SSE parsing:** axios with `responseType: 'text'` and `onDownloadProgress`; accumulate `data:` lines; each line JSON `{choices: [{delta: {content: string}}]}`; strip `data: ` prefix; ignore `[DONE]`. If no streaming callback provided, still stream-parse internally and return the full text.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src/services/__tests__/cloudService.test.ts`:
 
@@ -870,12 +870,12 @@ it('testConnection reports error on failure', async () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx jest src/services/__tests__/cloudService.test.ts`
 Expected: FAIL — module doesn't exist.
 
-- [ ] **Step 3: Implement `cloudService.ts`**
+- [x] **Step 3: Implement `cloudService.ts`**
 
 SSE with axios can't read the response body, so this client uses `fetch` with a `ReadableStream` reader (Hermes on RN 0.74 supports `fetch` + `ReadableStream` + `TextDecoder`).
 
@@ -1055,12 +1055,12 @@ beforeEach(() => {
 });
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npx jest src/services/__tests__/cloudService.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/cloudService.ts src/services/__tests__/cloudService.test.ts
@@ -1082,7 +1082,7 @@ git commit -m "feat: OpenAI-compatible cloud client with SSE streaming"
 - Produces (settingsStore): `provider: 'local' | 'cloud'` (default `'local'`), `cloudBaseUrl: string` (default `'https://api.openai.com/v1'`), `cloudApiKey: string` (default `''`), `cloudModel: string` (default `'gpt-4o-mini'`), `cloudFallbackEnabled: boolean` (default `true`), `enabledSources: SourceKey[]` (default all four), plus setters: `setProvider`, `setCloudBaseUrl`, `setCloudApiKey`, `setCloudModel`, `setCloudFallbackEnabled`, `setEnabledSources`.
 - Produces (inference): `complete(messages: CompletionMessage[], temperature?: number, maxTokens?: number): Promise<string>` and `stream(messages: CompletionMessage[], onToken: (t: string) => void, temperature?: number, maxTokens?: number): Promise<void>` — same signatures as `llamaService` so pipeline code swaps seamlessly.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `src/stores/__tests__/settingsStore.test.ts` — add:
 
@@ -1182,12 +1182,12 @@ it('cloud stream failure rethrows when fallback disabled', async () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx jest src/stores/__tests__/settingsStore.test.ts src/services/__tests__/inference.test.ts`
 Expected: FAIL — fields and module missing.
 
-- [ ] **Step 3: Implement settings store fields**
+- [x] **Step 3: Implement settings store fields**
 
 `src/stores/settingsStore.ts` — add to interface and store:
 
@@ -1232,7 +1232,7 @@ Setters:
       setEnabledSources: enabledSources => set({enabledSources}),
 ```
 
-- [ ] **Step 4: Implement `inference.ts`**
+- [x] **Step 4: Implement `inference.ts`**
 
 ```ts
 import {CompletionMessage} from './llamaService';
@@ -1289,7 +1289,7 @@ export async function stream(
 }
 ```
 
-- [ ] **Step 5: Update `EditorScreen` AiPanel to route through inference**
+- [x] **Step 5: Update `EditorScreen` AiPanel to route through inference**
 
 `src/screens/EditorScreen.tsx`:
 - Replace `import {complete} from '@/services/llamaService';` with `import {complete} from '@/services/inference';`
@@ -1308,12 +1308,12 @@ export async function stream(
 
 (keep the rest identical — `complete` signature is unchanged).
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `npx jest src/stores/__tests__/settingsStore.test.ts src/services/__tests__/inference.test.ts`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/stores/settingsStore.ts src/services/inference.ts src/screens/EditorScreen.tsx src/stores/__tests__/settingsStore.test.ts src/services/__tests__/inference.test.ts
@@ -1332,7 +1332,7 @@ git commit -m "feat: provider router with cloud fallback for all AI calls"
 - Consumes: `complete`, `stream` from `./inference`; `buildReferencesEntries`, `buildReferencesMarkdown` from `./referencesService`; `formatMarker` from `./citationFormat`; `SourceKey` from `./literatureSearch`.
 - Produces: `PipelineConfig` gains `sources?: SourcePaper[]` and `enabledSources?: SourceKey[]`. `runPipeline` skips stage-5 search when `config.sources` is provided (still emits `sources-found`), otherwise calls `searchLiterature(topic, questions, enabledSources)`. References come from `referencesService`, not the LLM.
 
-- [ ] **Step 1: Update tests to match new behavior**
+- [x] **Step 1: Update tests to match new behavior**
 
 `src/services/__tests__/pipelineService.test.ts` — the existing test asserts stage labels only; add:
 
@@ -1361,12 +1361,12 @@ it('references are built deterministically, not by the LLM', () => {
 
 (Kept here rather than Task 4 to avoid duplicating service tests — asserts pipeline integration point.)
 
-- [ ] **Step 2: Run tests to verify the new test fails**
+- [x] **Step 2: Run tests to verify the new test fails**
 
 Run: `npx jest src/services/__tests__/pipelineService.test.ts`
 Expected: the new test may pass (it tests referencesService); the pipeline changes below are what matter. Verify existing tests still pass BEFORE refactoring.
 
-- [ ] **Step 3: Refactor imports and config**
+- [x] **Step 3: Refactor imports and config**
 
 `src/services/pipelineService.ts`:
 - Replace `import {complete, stream} from './llamaService';` with `import {complete, stream} from './inference';`
@@ -1386,7 +1386,7 @@ export interface PipelineConfig {
 }
 ```
 
-- [ ] **Step 4: Update source formatting with markers**
+- [x] **Step 4: Update source formatting with markers**
 
 Replace `formatSources` with a marker-aware version:
 
@@ -1409,7 +1409,7 @@ function formatSources(
 
 Update its two call sites (in `runSection` userPrompt and stage-5 block) to pass `config.citationStyle, config.citationEdition`.
 
-- [ ] **Step 5: Deterministic references — split abstract from references**
+- [x] **Step 5: Deterministic references — split abstract from references**
 
 In `runSection`'s userPrompt, change the final instruction from "Use ${citStyle} in-text citations where appropriate, citing only the sources listed above." to:
 
@@ -1451,7 +1451,7 @@ Return ONLY valid JSON — no markdown:
 
 Remove `formatSourcesForReferences` (no longer used).
 
-- [ ] **Step 6: Update the main pipeline flow**
+- [x] **Step 6: Update the main pipeline flow**
 
 In `runPipeline`:
 
@@ -1535,12 +1535,12 @@ Save: pass sources into the create call:
 
 (Add `sourcesJson` to the `create` options type in `DocumentRepository.create` — `Partial<{citationStyle: string; citationEdition: string; sourcesJson: string}>` — and apply `doc.sourcesJson = options.sourcesJson ?? '';`.)
 
-- [ ] **Step 7: Run the tests**
+- [x] **Step 7: Run the tests**
 
 Run: `npx jest src/services/__tests__/pipelineService.test.ts src/services/__tests__/llamaService.test.ts`
 Expected: PASS
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/services/pipelineService.ts src/db/DocumentRepository.ts src/services/__tests__/pipelineService.test.ts
@@ -1561,7 +1561,7 @@ git commit -m "feat: provider-agnostic pipeline with deterministic references an
 - Consumes: `searchLiterature`, `SourceKey`, `SourcePaper` from `./literatureSearch`; `useSettingsStore.enabledSources`/`setEnabledSources`.
 - Produces: new route `CitationReview` with params `{topic: string; citationStyle: string; citationEdition: string; researchType: string; academicLevel: string; paperLength: string; context?: string}`; `Progress` params gain `sources?: SourcePaper[]; enabledSources?: SourceKey[]`.
 
-- [ ] **Step 1: Wire the route**
+- [x] **Step 1: Wire the route**
 
 `src/navigation/AppNavigator.tsx`:
 
@@ -1579,7 +1579,7 @@ git commit -m "feat: provider-agnostic pipeline with deterministic references an
 
 Add lazy import + screen registration (after `Generate`), title `'Review Sources'`.
 
-- [ ] **Step 2: Update `GenerateScreen`**
+- [x] **Step 2: Update `GenerateScreen`**
 
 - `handleGenerate`: only require the local model when provider is `local`:
 
@@ -1616,7 +1616,7 @@ Add lazy import + screen registration (after `Generate`), title `'Review Sources
   }
 ```
 
-- [ ] **Step 3: Create `CitationReviewScreen.tsx`**
+- [x] **Step 3: Create `CitationReviewScreen.tsx`**
 
 ```tsx
 import React, {useState} from 'react';
@@ -1841,7 +1841,7 @@ export default function CitationReviewScreen({route, navigation}: Props) {
 
 (Full `StyleSheet` follows the patterns in `GenerateScreen`: `heading` 24px/800 `#111827`, `label` 13px/600 `#374151`, chips with `#6366f1` selection, `generateButton` `#6366f1`, cards `#f9fafb` with border `#e5e7eb`. Reuse the exact values from `GenerateScreen.tsx`.)
 
-- [ ] **Step 4: Update `ProgressScreen` params + config**
+- [x] **Step 4: Update `ProgressScreen` params + config**
 
 `src/navigation/AppNavigator.tsx` — `Progress` params gain:
 
@@ -1885,12 +1885,12 @@ Replace the model gate:
 
 Add `import {isCloudConfigured} from '@/services/cloudService';` and `import {useSettingsStore} from '@/stores/settingsStore';` to ProgressScreen.
 
-- [ ] **Step 5: Run the existing test suite**
+- [x] **Step 5: Run the existing test suite**
 
 Run: `npx jest`
 Expected: PASS (all existing tests; new screen has no unit tests — UI-only, consistent with repo conventions)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/screens/CitationReviewScreen.tsx src/navigation/AppNavigator.tsx src/screens/GenerateScreen.tsx src/screens/ProgressScreen.tsx
@@ -1908,7 +1908,7 @@ git commit -m "feat: source selection and paper review step before generation"
 - Consumes: `useSettingsStore.setProvider`.
 - Produces: on fatal error when cloud was active, render buttons **Retry** and **Use on-device model instead** (the latter sets `provider = 'local'` and re-runs the pipeline).
 
-- [ ] **Step 1: Add state + re-run mechanism**
+- [x] **Step 1: Add state + re-run mechanism**
 
 In `ProgressScreen.tsx`:
 
@@ -1937,7 +1937,7 @@ Inside the `case 'error':` handler, when `event.fatal`:
             }
 ```
 
-- [ ] **Step 2: Render fallback buttons**
+- [x] **Step 2: Render fallback buttons**
 
 In the `fatalError` branch, replace the single "Go Back" button with:
 
@@ -1966,12 +1966,12 @@ In the `fatalError` branch, replace the single "Go Back" button with:
 
 Add `localButton: {backgroundColor: '#eef2ff'}` to the StyleSheet.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `npx jest` — PASS. Manual check not possible here; logic reviewed.
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/screens/ProgressScreen.tsx
@@ -1995,7 +1995,7 @@ git commit -m "feat: retry and on-device fallback on cloud generation failure"
 - Consumes: `formatMarker`, `formatReference` from `./citationFormat`; `buildReferencesEntries` from `./referencesService`; `searchLiterature`, `SourcePaper`, `SourceKey` from `./literatureSearch`; `documentRepository.updateSources`.
 - Produces (EditorRef): `replaceCitationMarkers(index: number, oldMarker: string, newMarker: string): void`; `replaceReferences(entries: string[]): void`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `src/components/editor/__tests__/quillHtml.test.ts`, add:
 
@@ -2014,12 +2014,12 @@ it('embeds replaceReferences command handler', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx jest src/components/editor/__tests__/quillHtml.test.ts`
 Expected: FAIL — commands not present.
 
-- [ ] **Step 3: Implement WebView commands**
+- [x] **Step 3: Implement WebView commands**
 
 In `src/components/editor/quillHtml.ts`, inside `executeCommand`, add before `case 'setPaperSize':`:
 
@@ -2069,7 +2069,7 @@ In `src/components/editor/quillHtml.ts`, inside `executeCommand`, add before `ca
         }
 ```
 
-- [ ] **Step 4: Add EditorRef methods**
+- [x] **Step 4: Add EditorRef methods**
 
 `src/components/editor/EditorWebView.tsx` — add to `EditorRef` interface and the forwarded methods:
 
@@ -2088,12 +2088,12 @@ In `src/components/editor/quillHtml.ts`, inside `executeCommand`, add before `ca
     replaceReferences: entries => postCmd({cmd: 'replaceReferences', entries}),
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `npx jest src/components/editor/__tests__/quillHtml.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: Create `CitationManagerModal.tsx`**
+- [x] **Step 6: Create `CitationManagerModal.tsx`**
 
 Bottom-sheet Modal (pattern from `AiPanel.tsx`), props:
 
@@ -2110,7 +2110,7 @@ interface Props {
 
 Render each source row: `formatMarker(paper, style, i + 1)` badge, title, and the formatted reference preview (`formatReference(paper, style, edition, i + 1)`), plus a "Replace" button calling `onReplace(i)`.
 
-- [ ] **Step 7: Create `CitationPickerModal.tsx`**
+- [x] **Step 7: Create `CitationPickerModal.tsx`**
 
 Props:
 
@@ -2127,7 +2127,7 @@ interface Props {
 
 Content: query `TextInput`, source chips (same 4 toggles), "Search" button → `searchLiterature(query, [], enabledSources)`, results list excluding the current paper (compare `doi` OR title equality); tapping a result calls `onPick(paper)`. Search state (`results`, `searching`, `error`) internal. On error show inline text.
 
-- [ ] **Step 8: Add toolbar buttons**
+- [x] **Step 8: Add toolbar buttons**
 
 `TabToolbar.tsx` — add props `onCitations: () => void` and `onChat: () => void`; in `renderReferencesTab()` add a Citations button before the link button:
 
@@ -2145,7 +2145,7 @@ In `renderReviewTab()` add the chat button:
 
 Wire both through the Props interface and destructuring.
 
-- [ ] **Step 9: Wire swap flow in `EditorScreen.tsx`**
+- [x] **Step 9: Wire swap flow in `EditorScreen.tsx`**
 
 Add state and imports:
 
@@ -2239,12 +2239,12 @@ Render both modals near the other modals:
 
 Wire toolbar: `onCitations={() => setShowCitations(true)}`, `onChat={() => setShowChat(true)}` (chat state added in Task 11 — add `const [showChat, setShowChat] = useState(false);` here so Task 11 only extends the panel).
 
-- [ ] **Step 10: Run the full test suite**
+- [x] **Step 10: Run the full test suite**
 
 Run: `npx jest`
 Expected: PASS
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add src/components/editor/quillHtml.ts src/components/editor/EditorWebView.tsx src/components/editor/CitationManagerModal.tsx src/components/editor/CitationPickerModal.tsx src/components/editor/TabToolbar.tsx src/screens/EditorScreen.tsx src/components/editor/__tests__/quillHtml.test.ts
@@ -2268,7 +2268,7 @@ git commit -m "feat: in-editor citation manager with deterministic reference upd
   - `buildSystemPrompt(paperText: string, sources: SourcePaper[], style: string, edition: string): string` — paper content truncated to 15,000 chars with a note, sources with markers.
   - `trimMessages(messages: ChatMessage[], max?: number): ChatMessage[]` — keeps the last `max` (default 50).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src/services/__tests__/chatService.test.ts`:
 
@@ -2319,12 +2319,12 @@ it('keeps short histories unchanged', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx jest src/services/__tests__/chatService.test.ts`
 Expected: FAIL — module doesn't exist.
 
-- [ ] **Step 3: Implement `chatService.ts`**
+- [x] **Step 3: Implement `chatService.ts`**
 
 ```ts
 import {SourcePaper} from './literatureSearch';
@@ -2381,7 +2381,7 @@ export function trimMessages(
 }
 ```
 
-- [ ] **Step 4: Create `ChatPanel.tsx`**
+- [x] **Step 4: Create `ChatPanel.tsx`**
 
 Bottom-sheet Modal (pattern from `AiPanel.tsx`), props:
 
@@ -2399,7 +2399,7 @@ interface Props {
 
 Render: header "AI Assistant", `FlatList`-style ScrollView of bubbles (user right-aligned `#6366f1` white text; assistant left-aligned gray card), an "Apply" button on assistant messages not yet applied (label `✓ Applied` when `applied`), a streaming bubble while `busy && streamingText`, and a bottom input row (`TextInput` + send button `➤`). `onSend` clears the input (internal `TextInput` state).
 
-- [ ] **Step 5: Wire chat into `EditorScreen.tsx`**
+- [x] **Step 5: Wire chat into `EditorScreen.tsx`**
 
 Add state:
 
@@ -2526,12 +2526,12 @@ Render the panel (before the closing `</SafeAreaView>`):
 
 Imports to add in EditorScreen: `ChatPanel`, `ChatMessage`, `buildSystemPrompt`, `trimMessages` from `@/services/chatService`, `stream` from `@/services/inference`.
 
-- [ ] **Step 6: Run the full test suite**
+- [x] **Step 6: Run the full test suite**
 
 Run: `npx jest`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/services/chatService.ts src/components/editor/ChatPanel.tsx src/screens/EditorScreen.tsx src/services/__tests__/chatService.test.ts
@@ -2549,7 +2549,7 @@ git commit -m "feat: paper-aware chat panel with apply-to-cursor"
 **Interfaces:**
 - Consumes: `useSettingsStore` provider fields/setters; `testConnection` from `./cloudService`.
 
-- [ ] **Step 1: Add provider UI state + section**
+- [x] **Step 1: Add provider UI state + section**
 
 `SettingsScreen.tsx` — add imports:
 
@@ -2696,7 +2696,7 @@ Add styles:
   testFail: {color: '#dc2626'},
 ```
 
-- [ ] **Step 2: Update the About tagline**
+- [x] **Step 2: Update the About tagline**
 
 Change the "Fully offline · No API keys required" tagline to:
 
@@ -2704,12 +2704,12 @@ Change the "Fully offline · No API keys required" tagline to:
       <Text style={styles.tagline}>On-device AI · Optional cloud provider</Text>
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `npx jest`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/screens/SettingsScreen.tsx
