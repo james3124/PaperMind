@@ -57,6 +57,10 @@ export default function ProgressScreen({route, navigation}: Props) {
     async function run() {
       setFatalError(null);
       setFailedWithCloud(false);
+      setCompletedStages(new Set());
+      setErrorStages(new Set());
+      setStreamText('');
+      setErrors([]);
       const provider = useSettingsStore.getState().provider;
       const needsLocal =
         provider === 'local' ||
