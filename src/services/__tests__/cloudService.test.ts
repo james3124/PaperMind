@@ -103,3 +103,82 @@ it('testConnection reports error on failure', async () => {
   expect(res.ok).toBe(false);
   expect(res.error).toContain('network down');
 });
+
+describe('30s request timeout', () => {
+  function hangingFetch(init?: RequestInit) {
+    return new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        reject(new DOMException('Aborted', 'AbortError'));
+      });
+    });
+  }
+
+  function expectCloudTimeout(promise: Promise<string>): Promise<void> {
+    return expect(promise).rejects.toThrow('Request timed out (30s)');
+  }
+
+  function expectConnectionTimeout(promise: Promise<unknown>): Promise<void> {
+    return expect(promise).resolves.toEqual({
+      ok: false,
+      error: 'Request timed out (30s)',
+    });
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('completeCloud rejects with the timeout message when the request hangs', async () => {
+    global.fetch = jest.fn((_url, init) =>
+      hangingFetch(init as RequestInit),
+    ) as unknown as typeof fetch;
+    const promise = completeCloud([{role: 'user', content: 'hi'}]);
+    const assertion = expectCloudTimeout(promise);
+    await jest.advanceTimersByTimeAsync(30_000);
+    await assertion;
+  });
+
+  it('completeCloud times out the non-streaming fallback fetch too', async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('stream failed'))
+      .mockImplementationOnce((_url, init) =>
+        hangingFetch(init as RequestInit),
+      ) as unknown as typeof fetch;
+    const promise = completeCloud([{role: 'user', content: 'hi'}]);
+    const assertion = expectCloudTimeout(promise);
+    await jest.advanceTimersByTimeAsync(30_000);
+    await assertion;
+    const fallbackInit = (global.fetch as jest.Mock).mock.calls[1][1];
+    expect(fallbackInit.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('testConnection resolves with a timeout error instead of throwing when the request hangs', async () => {
+    global.fetch = jest.fn((_url, init) =>
+      hangingFetch(init as RequestInit),
+    ) as unknown as typeof fetch;
+    const promise = testConnection();
+    const assertion = expectConnectionTimeout(promise);
+    await jest.advanceTimersByTimeAsync(30_000);
+    await assertion;
+  });
+
+  it('a fast response clears the timer and succeeds', async () => {
+    mockFetch({});
+    await expect(completeCloud([{role: 'user', content: 'hi'}])).resolves.toBe(
+      'Hello world',
+    );
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('testConnection clears the timer on a fast success', async () => {
+    mockFetch({});
+    const res = await testConnection();
+    expect(res.ok).toBe(true);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+});

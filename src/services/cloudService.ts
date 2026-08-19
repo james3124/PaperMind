@@ -1,6 +1,17 @@
 import {CompletionMessage} from './llamaService';
 import {useSettingsStore} from '@/stores/settingsStore';
 
+const TIMEOUT_MS = 30_000;
+
+function withTimeout(): {signal: AbortSignal; clear: () => void} {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  return {
+    signal: controller.signal,
+    clear: () => clearTimeout(timer),
+  };
+}
+
 export function getCloudConfig() {
   const s = useSettingsStore.getState();
   return {
@@ -30,6 +41,7 @@ export async function completeCloud(
   const {temperature = 0.7, maxTokens = 1024, onToken} = opts;
 
   let fullText = '';
+  const streaming = withTimeout();
   try {
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
@@ -44,6 +56,7 @@ export async function completeCloud(
         temperature,
         max_tokens: maxTokens,
       }),
+      signal: streaming.signal,
     });
     if (!res.ok || !res.body) {
       throw new Error(`HTTP ${res.status}`);
@@ -81,32 +94,48 @@ export async function completeCloud(
       }
     }
   } catch (e) {
-    // Non-streaming fallback.
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false,
-        temperature,
-        max_tokens: maxTokens,
-      }),
-    });
-    if (!res.ok) {
-      throw new Error(
-        `Cloud request failed (HTTP ${res.status})${
-          e instanceof Error ? `: ${e.message}` : ''
-        }`,
-      );
+    if (streaming.signal.aborted) {
+      throw new Error('Request timed out (30s)');
     }
-    const data = (await res.json()) as {
-      choices?: {message?: {content?: string}}[];
-    };
-    fullText = (data.choices?.[0]?.message?.content ?? '').trim();
+    // Non-streaming fallback.
+    const fallback = withTimeout();
+    try {
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          stream: false,
+          temperature,
+          max_tokens: maxTokens,
+        }),
+        signal: fallback.signal,
+      });
+      if (!res.ok) {
+        throw new Error(
+          `Cloud request failed (HTTP ${res.status})${
+            e instanceof Error ? `: ${e.message}` : ''
+          }`,
+        );
+      }
+      const data = (await res.json()) as {
+        choices?: {message?: {content?: string}}[];
+      };
+      fullText = (data.choices?.[0]?.message?.content ?? '').trim();
+    } catch (e2) {
+      if (fallback.signal.aborted) {
+        throw new Error('Request timed out (30s)');
+      }
+      throw e2;
+    } finally {
+      fallback.clear();
+    }
+  } finally {
+    streaming.clear();
   }
   return fullText;
 }
@@ -118,6 +147,7 @@ export async function testConnection(): Promise<{
 }> {
   const {baseUrl, apiKey, model} = getCloudConfig();
   const start = Date.now();
+  const {signal, clear} = withTimeout();
   try {
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
@@ -131,6 +161,7 @@ export async function testConnection(): Promise<{
         stream: false,
         max_tokens: 1,
       }),
+      signal,
     });
     if (!res.ok) {
       return {ok: false, error: `HTTP ${res.status}`};
@@ -138,9 +169,14 @@ export async function testConnection(): Promise<{
     await res.json();
     return {ok: true, latencyMs: Date.now() - start};
   } catch (e) {
+    if (signal.aborted) {
+      return {ok: false, error: 'Request timed out (30s)'};
+    }
     return {
       ok: false,
       error: e instanceof Error ? e.message : String(e),
     };
+  } finally {
+    clear();
   }
 }
