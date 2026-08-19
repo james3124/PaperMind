@@ -80,3 +80,22 @@ it('cloud stream failure rethrows when fallback disabled', async () => {
     'boom',
   );
 });
+
+it('stream: cloud failure falls back to local when fallback enabled', async () => {
+  useSettingsStore.setState({provider: 'cloud', cloudFallbackEnabled: true});
+  cloud.completeCloud.mockRejectedValue(new Error('boom'));
+  const tokens: string[] = [];
+  await stream([{role: 'user', content: 'x'}], t => tokens.push(t));
+  expect(tokens.join('')).toBe('local tokens');
+});
+
+it('stream: cloud failure rethrows when fallback disabled', async () => {
+  useSettingsStore.setState({
+    provider: 'cloud',
+    cloudFallbackEnabled: false,
+  });
+  cloud.completeCloud.mockRejectedValue(new Error('boom'));
+  await expect(
+    stream([{role: 'user', content: 'x'}], () => undefined),
+  ).rejects.toThrow('boom');
+});
