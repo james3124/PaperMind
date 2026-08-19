@@ -74,6 +74,7 @@ export default function EditorScreen({route, navigation}: Props) {
 
   const paperSize = useSettingsStore(s => s.paperSize);
   const setPaperSize = useSettingsStore(s => s.setPaperSize);
+  const enabledSources = useSettingsStore(s => s.enabledSources);
   const modelReady = useModelDownloadStore(s => s.modelReady);
 
   useEffect(() => {
@@ -426,7 +427,7 @@ export default function EditorScreen({route, navigation}: Props) {
       <CitationPickerModal
         visible={replaceIndex !== null}
         current={sources[replaceIndex] ?? ({} as SourcePaper)}
-        enabledSources={useSettingsStore.getState().enabledSources}
+        enabledSources={enabledSources}
         onToggleSource={(key: SourceKey) =>
           useSettingsStore
             .getState()
