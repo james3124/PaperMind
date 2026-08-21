@@ -1,3 +1,5 @@
+import {QUILL_CSS, QUILL_JS} from './vendor/quillAssets';
+
 export type PaperSizeKey = 'a4' | 'letter' | 'a5' | 'a3';
 
 export const PAPER_RATIOS: Record<PaperSizeKey, number> = {
@@ -7,22 +9,51 @@ export const PAPER_RATIOS: Record<PaperSizeKey, number> = {
   a3: 1.41,
 };
 
+const DARK_CSS = `
+    html, body { background: #111827; }
+    #editor { background: #1f2937; }
+    .ql-editor, .ql-editor h1, .ql-editor h2, .ql-editor h3 { color: #e5e7eb; }
+    table.ql-paper-table td {
+      border: 1px solid #374151;
+    }
+    table.ql-paper-table td[contenteditable="true"]:focus { outline: 2px solid #818cf8; outline-offset: -2px; }
+    hr.ql-page-break { border-top-color: #4b5563; }
+    hr.ql-paper-hr { border-top-color: #9ca3af; }
+  `;
+
 export function buildQuillHtml(
   initialContent: string,
   paperSize: PaperSizeKey = 'a4',
+  opts?: {dark?: boolean},
 ): string {
+  const dark = opts?.dark === true;
+  // Escape backslash/backtick/dollar for the JS template literal, and
+  // `</script` last so user content can never terminate the inline script
+  // early (`<\/script` inside the template literal evaluates back to
+  // `</script` at runtime).
   const escaped = initialContent
     .replace(/\\/g, '\\\\')
     .replace(/`/g, '\\`')
-    .replace(/\$/g, '\\$');
+    .replace(/\$/g, '\\$')
+    .replace(/<\/script/gi, '<\\/script');
 
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
+  <style>${QUILL_CSS}</style>
+  <script>
+    window.onerror = function (msg, src, line, col) {
+      try {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'error', message: String(msg), source: String(src), line: line, col: col,
+        }));
+      } catch {}
+      return false;
+    };
+  </script>
+  <script>${QUILL_JS}</script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; overflow: hidden; background: #d9d9d9; }
@@ -47,6 +78,7 @@ export function buildQuillHtml(
     /* PaperMind horizontal rule */
     hr.ql-paper-hr { border: none; border-top: 1px solid #374151; margin: 16px 0; }
   </style>
+  <style>${dark ? DARK_CSS : ''}</style>
 </head>
 <body>
   <div id="editor-container">
@@ -96,6 +128,15 @@ export function buildQuillHtml(
 
     const SpacingAttributor = new BlockStyle('spacing', 'line-height');
 
+    // Font size: reuse Quill v2's built-in style size attributor ("size" →
+    // font-size). Its default whitelist is ['10px','18px','32px']; override it
+    // with the sizes StyleBar offers (values are px strings because Quill
+    // writes them straight into inline styles).
+    const FontSize = Quill.import('attributors/style/size');
+    FontSize.whitelist = ['14px', '16px', '18px', '20px'];
+    const FONT_SIZE_VALUES = [14, 16, 18, 20];
+    Quill.register(FontSize, true);
+
     Quill.register(PaperTableBlot, true);
     Quill.register(PageBreakBlot, true);
     Quill.register(SpacingAttributor, true);
@@ -130,28 +171,111 @@ export function buildQuillHtml(
     applyPaperSize('${paperSize}');
 
     // ── Content change → React Native ───────────────────────────────────────
-    function postContentChange() {
+    // Trailing debounce (250ms): typing fires many text-change events; we only
+    // serialise quill.getContents()/getText() at send time so rapid keystrokes
+    // produce one post with the final state instead of one per keystroke.
+    let saveTimer = null;
+    let contentDirty = false;
+    // When true, text-change events only mark dirty without scheduling a send
+    // (used by findReplace to batch many edits into one update).
+    let suppressChangePosts = false;
+    // Set once per burst when the debounce schedules a pending send, so the
+    // 'save-state: dirty' message is posted once per burst, not per keystroke.
+    let saveStateNotifiedDirty = false;
+
+    function postSaveState(state) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'save-state', state,
+      }));
+    }
+
+    function postContentChangeNow() {
       clearTimeout(saveTimer);
+      saveTimer = null;
+      if (!contentDirty) return;
+      contentDirty = false;
       const delta = JSON.stringify(quill.getContents());
       const text  = quill.getText();
       const words = text.trim().split(/\\s+/).filter(Boolean).length;
       window.ReactNativeWebView.postMessage(JSON.stringify({
         type: 'content-change', delta, wordCount: words,
       }));
+      saveStateNotifiedDirty = false;
+      postSaveState('saved');
       saveTimer = setTimeout(() => {
         const selection = quill.getSelection();
         if (selection) postFormat(selection.index);
       }, 100);
     }
-    let saveTimer = null;
+
+    function postContentChange() {
+      contentDirty = true;
+      if (suppressChangePosts) return;
+      if (!saveStateNotifiedDirty) {
+        saveStateNotifiedDirty = true;
+        postSaveState('dirty');
+      }
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(postContentChangeNow, 250);
+    }
+
     quill.on('text-change', postContentChange);
     document.getElementById('editor').addEventListener('input', (e) => {
       const table = e.target.closest('table.ql-paper-table');
       if (table) postContentChange();
     });
 
+    // ── Markdown input shortcuts ─────────────────────────────────────────────
+    // Fires only for real typing (source === 'user') when a single trailing
+    // space completes one of the prefixes below at the start of the current
+    // line. The prefix characters are deleted and the line format applied.
+    quill.on('text-change', function (delta, oldDelta, source) {
+      if (source !== 'user') return;
+      const ops = delta.ops || [];
+      const lastOp = ops[ops.length - 1];
+      if (!lastOp || lastOp.insert !== ' ') return;
+      let idx = 0;
+      for (let i = 0; i < ops.length - 1; i++) {
+        const op = ops[i];
+        if (op.delete != null) return; // deletions involved — not plain typing
+        idx += typeof op.insert === 'string' ? op.insert.length : (op.retain != null ? op.retain : 0);
+      }
+      const sel = quill.getSelection();
+      if (!sel) return;               // no selection: skip conservatively
+      if (getTableAtSelection()) return; // never reformat inside table cells
+      const cursor = sel.index;
+      if (idx !== cursor - 1) return;  // the space must land right at the cursor
+      const lineStart = quill.getText(0, cursor).lastIndexOf('\\n') + 1;
+      const lineText = quill.getText(lineStart, cursor - lineStart);
+      const rules = [
+        { prefix: '### ', format: { header: 3 } },
+        { prefix: '## ', format: { header: 2 } },
+        { prefix: '# ', format: { header: 1 } },
+        { prefix: '- ', format: { list: 'bullet' } },
+        { prefix: '* ', format: { list: 'bullet' } },
+        { prefix: '1. ', format: { list: 'ordered' } },
+        { prefix: '> ', format: { blockquote: true } },
+      ];
+      for (let r = 0; r < rules.length; r++) {
+        if (lineText === rules[r].prefix) {
+          quill.deleteText(lineStart, rules[r].prefix.length, 'user');
+          quill.formatLine(lineStart, 0, rules[r].format, 'user');
+          break;
+        }
+      }
+    });
+
+    // Flush pending content immediately on unload so nothing is lost.
+    window.addEventListener('beforeunload', () => {
+      contentDirty ? postContentChangeNow() : clearTimeout(saveTimer);
+    });
+
     quill.on('selection-change', (range) => {
-      if (!range) return;
+      if (!range) {
+        // Blur: flush pending debounced content before the editor loses focus.
+        postContentChangeNow();
+        return;
+      }
       postFormat(range.index);
       if (range.length > 0) {
         const selected = quill.getText(range.index, range.length).trim();
@@ -237,18 +361,37 @@ export function buildQuillHtml(
     function deleteTable() {
       const table = getTableAtSelection();
       if (!table) return;
-      const range = quill.getSelection();
-      if (range) { quill.deleteText(range.index, 1); }
-      else if (table.parentNode) { table.parentNode.removeChild(table); }
+      // Resolve the blot from the table DOM node and delete at its document
+      // index — deleting 1 char from the cursor range would eat an adjacent
+      // character instead of removing the table embed.
+      const blot = Quill.find(table);
+      if (blot) {
+        const index = quill.getIndex(blot);
+        quill.deleteText(index, 1);
+      } else if (table.parentNode) {
+        table.parentNode.removeChild(table);
+      }
       postContentChange();
     }
 
     // ── Command dispatcher ───────────────────────────────────────────────────
+    // Both listeners are needed: Android fires 'message' on document while iOS
+    // fires it on window. On platforms where BOTH fire for one injected
+    // command, the identical payload would execute twice (e.g. double text
+    // insertion) — the dedupe guard below makes each payload run only once.
     document.addEventListener('message', handleMessage);
     window.addEventListener('message', handleMessage);
 
+    let lastExecuted = '';
+    let lastExecutedAt = 0;
+
     function handleMessage(event) {
-      try { executeCommand(JSON.parse(event.data)); } catch {}
+      const payload = event && event.data != null ? String(event.data) : '';
+      const now = Date.now();
+      if (payload === lastExecuted && now - lastExecutedAt < 50) return;
+      lastExecuted = payload;
+      lastExecutedAt = now;
+      try { executeCommand(JSON.parse(payload)); } catch {}
     }
 
     function executeCommand(msg) {
@@ -256,6 +399,12 @@ export function buildQuillHtml(
         case 'format':
           quill.format(msg.key, msg.value);
           break;
+
+        case 'setFontSize': {
+          if (FONT_SIZE_VALUES.indexOf(msg.size) === -1) break;
+          quill.format('size', msg.size + 'px');
+          break;
+        }
 
         case 'insertText': {
           quill.focus();
@@ -355,6 +504,9 @@ export function buildQuillHtml(
           break;
 
         case 'getContent':
+          // Flush any debounced pending change so the response reflects the
+          // latest state.
+          postContentChangeNow();
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'content', delta: JSON.stringify(quill.getContents()),
           }));
@@ -366,12 +518,21 @@ export function buildQuillHtml(
           const replace = msg.replace;
           if (!find) break;
           let idx = 0, count = 0;
-          while ((idx = text.indexOf(find, idx)) !== -1) {
-            quill.deleteText(idx, find.length);
-            quill.insertText(idx, replace || '');
-            idx += (replace || '').length;
-            count++;
+          // Suppress per-match text-change posts while batch-replacing:
+          // each delete/insert pair would otherwise trigger a full
+          // serialise + post and add N undo history entries.
+          suppressChangePosts = true;
+          try {
+            while ((idx = text.indexOf(find, idx)) !== -1) {
+              quill.deleteText(idx, find.length);
+              quill.insertText(idx, replace || '');
+              idx += (replace || '').length;
+              count++;
+            }
+          } finally {
+            suppressChangePosts = false;
           }
+          if (count > 0) postContentChangeNow();
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'replace-done', count,
           }));

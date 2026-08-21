@@ -19,6 +19,7 @@ export interface SettingsState {
   cloudModel: string;
   cloudFallbackEnabled: boolean;
   enabledSources: SourceKey[];
+  wordGoal?: number;
   // Actions
   setModelPath: (p: string) => void;
   setModelLoaded: (loaded: boolean) => void;
@@ -32,6 +33,7 @@ export interface SettingsState {
   setCloudModel: (m: string) => void;
   setCloudFallbackEnabled: (v: boolean) => void;
   setEnabledSources: (s: SourceKey[]) => void;
+  setWordGoal: (g: number | undefined) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -64,6 +66,7 @@ export const useSettingsStore = create<SettingsState>()(
       setCloudFallbackEnabled: cloudFallbackEnabled =>
         set({cloudFallbackEnabled}),
       setEnabledSources: enabledSources => set({enabledSources}),
+      setWordGoal: wordGoal => set({wordGoal}),
     }),
     {
       name: 'papermind-settings',

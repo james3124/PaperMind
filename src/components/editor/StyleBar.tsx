@@ -17,9 +17,27 @@ const STYLES = [
 
 interface Props {
   onStyle: (key: string, value: unknown) => void;
+  fontSize?: number;
+  onFontSizeChange?: (size: number) => void;
 }
 
-export default function StyleBar({onStyle}: Props) {
+const SIZES = [14, 16, 18, 20];
+
+export default function StyleBar({
+  onStyle,
+  fontSize,
+  onFontSizeChange,
+}: Props) {
+  const step = (dir: -1 | 1) => {
+    if (!onFontSizeChange || fontSize === undefined) {
+      return;
+    }
+    const idx = SIZES.indexOf(fontSize);
+    const current = idx === -1 ? SIZES.indexOf(16) : idx;
+    const next = Math.min(SIZES.length - 1, Math.max(0, current + dir));
+    onFontSizeChange(SIZES[next]);
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -34,6 +52,22 @@ export default function StyleBar({onStyle}: Props) {
             <Text style={styles.pillText}>{s.label}</Text>
           </TouchableOpacity>
         ))}
+        {onFontSizeChange && fontSize !== undefined && (
+          <>
+            <TouchableOpacity
+              style={styles.pill}
+              disabled={fontSize <= SIZES[0]}
+              onPress={() => step(-1)}>
+              <Text style={styles.pillText}>A−</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.pill}
+              disabled={fontSize >= SIZES[SIZES.length - 1]}
+              onPress={() => step(1)}>
+              <Text style={styles.pillText}>A+</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
     </View>
   );

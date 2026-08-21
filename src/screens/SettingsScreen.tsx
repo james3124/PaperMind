@@ -224,6 +224,25 @@ export default function SettingsScreen({navigation}: Props) {
         />
       </View>
 
+      {/* ── Writing Goal ─────────────────────────── */}
+      <SectionHeader label="Writing" />
+      <Text style={styles.hint}>
+        Daily word count target shown in the editor. Leave empty for none.
+      </Text>
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>Word goal</Text>
+        <TextInput
+          style={[styles.textInput, styles.goalInput]}
+          value={store.wordGoal !== undefined ? String(store.wordGoal) : ''}
+          onChangeText={text => {
+            const n = parseInt(text.replace(/[^0-9]/g, ''), 10);
+            store.setWordGoal(Number.isNaN(n) || n <= 0 ? undefined : n);
+          }}
+          placeholder="e.g. 1500"
+          keyboardType="numeric"
+        />
+      </View>
+
       {/* ── About ──────────────────────────────────── */}
       <SectionHeader label="About" />
       <View style={styles.row}>
@@ -323,6 +342,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     backgroundColor: '#fff',
   },
+  goalInput: {width: 120, paddingVertical: 6, textAlign: 'right'},
   testMessage: {fontSize: 13, marginTop: 8},
   testOk: {color: '#16a34a'},
   testFail: {color: '#dc2626'},

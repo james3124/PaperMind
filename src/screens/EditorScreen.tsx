@@ -80,13 +80,21 @@ export default function EditorScreen({route, navigation}: Props) {
   const [chatStreaming, setChatStreaming] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
   const [replaceIndex, setReplaceIndex] = useState<number | null>(null);
+  const [fontSize, setFontSize] = useState(16);
+  const [saveState, setSaveState] = useState<'idle' | 'dirty' | 'saved'>(
+    'idle',
+  );
 
   const paperSize = useSettingsStore(s => s.paperSize);
   const setPaperSize = useSettingsStore(s => s.setPaperSize);
   const enabledSources = useSettingsStore(s => s.enabledSources);
+  const theme = useSettingsStore(s => s.theme);
+  const wordGoal = useSettingsStore(s => s.wordGoal);
+  const isDark = theme === 'dark';
   const modelReady = useModelDownloadStore(s => s.modelReady);
 
   useEffect(() => {
+    setSaveState('idle');
     documentRepository.getById(documentId).then(doc => {
       if (doc) {
         setTitle(doc.title);
@@ -359,15 +367,15 @@ export default function EditorScreen({route, navigation}: Props) {
       : '●';
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, isDark && styles.darkBg]}>
       {/* App Bar */}
-      <View style={styles.appBar}>
+      <View style={[styles.appBar, isDark && styles.darkSurface]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backBtn}>
           <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.titleText} numberOfLines={1}>
+        <Text style={[styles.titleText, isDark && styles.darkText]} numberOfLines={1}>
           {title}
         </Text>
         <Text style={styles.saveStatus}>{saveIndicator}</Text>
@@ -429,6 +437,11 @@ export default function EditorScreen({route, navigation}: Props) {
 
       <StyleBar
         onStyle={(key, value) => editorRef.current?.format(key, value)}
+        fontSize={fontSize}
+        onFontSizeChange={s => {
+          setFontSize(s);
+          editorRef.current?.format('size', `${s}px`);
+        }}
       />
 
       <KeyboardAvoidingView
@@ -437,7 +450,8 @@ export default function EditorScreen({route, navigation}: Props) {
         keyboardVerticalOffset={0}>
         <View style={styles.flex}>
           {editorReady ? null : (
-            <View style={styles.loading}>
+            <View style={[styles.loading, isDark && styles.darkBg]}>
+              <ActivityIndicator size="large" color="#6366f1" />
               <Text style={styles.loadingText}>Loading editor…</Text>
             </View>
           )}
@@ -445,6 +459,7 @@ export default function EditorScreen({route, navigation}: Props) {
             ref={editorRef}
             initialContent={content}
             paperSize={paperSize}
+            dark={isDark}
             onContentChange={onContentChange}
             onFormatChange={onFormatChange}
             onHeadings={onHeadings}
@@ -458,6 +473,7 @@ export default function EditorScreen({route, navigation}: Props) {
               }
             }}
             onReady={() => setEditorReady(true)}
+            onSaveStateChange={setSaveState}
           />
           {showOutline && (
             <OutlinePanel
@@ -469,11 +485,27 @@ export default function EditorScreen({route, navigation}: Props) {
         </View>
       </KeyboardAvoidingView>
 
-      <View style={styles.statusBar}>
-        <Text style={styles.statusText}>
-          {wordCount} words · ~{estimatedPages}{' '}
-          {estimatedPages === 1 ? 'page' : 'pages'} · {readMinutes} min read
+      <View style={[styles.statusBar, isDark && styles.darkSurface]}>
+        <Text
+          style={[
+            styles.statusText,
+            wordGoal !== undefined && wordCount >= wordGoal && styles.goalMet,
+          ]}>
+          {wordCount} words{wordGoal !== undefined ? ` / ${wordGoal}` : ''} ·
+          ~{estimatedPages} {estimatedPages === 1 ? 'page' : 'pages'} ·{' '}
+          {readMinutes} min read
         </Text>
+        {saveState !== 'idle' && (
+          <View
+            style={[
+              styles.saveChip,
+              saveState === 'saved' ? styles.saveChipSaved : styles.saveChipDirty,
+            ]}>
+            <Text style={styles.saveChipText}>
+              {saveState === 'saved' ? 'Saved ✓' : 'Saving…'}
+            </Text>
+          </View>
+        )}
       </View>
 
       <AiPanel
@@ -585,6 +617,9 @@ const styles = StyleSheet.create({
   },
   loadingText: {color: '#9ca3af', fontSize: 14},
   statusBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 6,
     backgroundColor: '#f9fafb',
@@ -592,6 +627,19 @@ const styles = StyleSheet.create({
     borderTopColor: '#e5e7eb',
   },
   statusText: {fontSize: 11, color: '#9ca3af'},
+  goalMet: {color: '#10b981'},
+  saveChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+    marginLeft: 8,
+  },
+  saveChipDirty: {backgroundColor: '#9ca3af'},
+  saveChipSaved: {backgroundColor: '#10b981'},
+  saveChipText: {color: '#fff', fontSize: 11, fontWeight: '600'},
+  darkBg: {backgroundColor: '#111827'},
+  darkSurface: {backgroundColor: '#1f2937', borderTopColor: '#374151', borderBottomColor: '#374151'},
+  darkText: {color: '#e5e7eb'},
 });
 
 function extractPlainText(deltaJson: string): string {

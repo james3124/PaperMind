@@ -1,4 +1,9 @@
-import React, {forwardRef, useImperativeHandle, useRef} from 'react';
+import React, {
+  forwardRef,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+} from 'react';
 import {StyleSheet, Platform} from 'react-native';
 import WebView, {WebViewMessageEvent} from 'react-native-webview';
 import {buildQuillHtml} from './quillHtml';
@@ -42,11 +47,20 @@ interface Props {
   onReplaceResult: (count: number) => void;
   onSelectionText?: (text: string) => void;
   onReady: () => void;
+  onSaveStateChange?: (state: 'dirty' | 'saved') => void;
+  dark?: boolean;
 }
 
 const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
   const webviewRef = useRef<any>(null);
-  const html = buildQuillHtml(props.initialContent, props.paperSize);
+  const html = useMemo(
+    () =>
+      buildQuillHtml(props.initialContent, props.paperSize, {
+        dark: props.dark,
+      }),
+    [props.initialContent, props.paperSize, props.dark],
+  );
+  const source = useMemo(() => ({html}), [html]);
   const pendingGetContent = useRef<((delta: string) => void) | null>(null);
 
   function postCmd(cmd: Record<string, unknown>) {
@@ -104,12 +118,22 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
         case 'selection-text':
           props.onSelectionText?.(msg.text ?? '');
           break;
+        case 'error':
+          console.warn(
+            `[EditorWebView] WebView script error: ${msg.message} (${msg.source}:${msg.line}:${msg.col})`,
+          );
+          break;
         case 'content':
           pendingGetContent.current?.(msg.delta ?? '');
           pendingGetContent.current = null;
           break;
         case 'ready':
           props.onReady();
+          break;
+        case 'save-state':
+          props.onSaveStateChange?.(
+            msg.state === 'saved' ? 'saved' : 'dirty',
+          );
           break;
       }
     } catch {}
@@ -118,7 +142,7 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
   return (
     <WebView
       ref={webviewRef}
-      source={{html}}
+      source={source}
       style={styles.webview}
       originWhitelist={['*']}
       onMessage={onMessage}
