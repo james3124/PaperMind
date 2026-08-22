@@ -1,6 +1,12 @@
+<h1 align="center">
+  <a href="https://github.com/Zettlr/Zettlr">
+    <img src="n" alt="Zettlr" width="256" height="256" />
+  </a>
+  <br/>
+  # 📚 PaperMind
+</h1>
 <div align="center">
 
-# 📚 PaperMind
 
 **Write, generate, and edit complete academic research papers — entirely on your phone.**
 
