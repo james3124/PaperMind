@@ -1,4 +1,5 @@
 import {QUILL_CSS, QUILL_JS} from './vendor/quillAssets';
+import {EDITOR_FONTS} from './fonts';
 
 export type PaperSizeKey = 'a4' | 'letter' | 'a5' | 'a3';
 
@@ -60,6 +61,7 @@ export function buildQuillHtml(
     #editor-container { height: 100vh; overflow-y: auto; padding: 16px 8px; }
     #editor { background: #fff; margin: 0 auto; box-shadow: 0 2px 12px rgba(0,0,0,0.18); }
     .ql-container { font-family: 'Georgia', serif; font-size: 16px; border: none !important; }
+${EDITOR_FONTS.map(f => `    .ql-font-${f.key} { font-family: ${f.stack}; }`).join('\n')}
     .ql-editor { padding: 24px 28px; min-height: 100vh; line-height: 1.8; font-size: 16px; }
     .ql-editor h1 { font-size: 22px; margin-bottom: 12px; }
     .ql-editor h2 { font-size: 18px; margin-bottom: 10px; }
@@ -136,6 +138,12 @@ export function buildQuillHtml(
     FontSize.whitelist = ['14px', '16px', '18px', '20px'];
     const FONT_SIZE_VALUES = [14, 16, 18, 20];
     Quill.register(FontSize, true);
+
+    // Font family: class-based attributor (adds .ql-font-<key>); the actual
+    // stacks live in the generated CSS below.
+    const FontStyle = Quill.import('attributors/class/font');
+    FontStyle.whitelist = ${JSON.stringify(EDITOR_FONTS.map(f => f.key))};
+    Quill.register(FontStyle, true);
 
     Quill.register(PaperTableBlot, true);
     Quill.register(PageBreakBlot, true);

@@ -21,6 +21,7 @@ import {markdownToDeltaJson} from '@/utils/markdownToQuillDelta';
 import EditorWebView, {EditorRef} from '@/components/editor/EditorWebView';
 import TabToolbar from '@/components/editor/TabToolbar';
 import StyleBar from '@/components/editor/StyleBar';
+import {DEFAULT_FONT_KEY} from '@/components/editor/fonts';
 import OutlinePanel from '@/components/editor/OutlinePanel';
 import FindReplaceBar from '@/components/editor/FindReplaceBar';
 import AiPanel from '@/components/editor/AiPanel';
@@ -81,6 +82,7 @@ export default function EditorScreen({route, navigation}: Props) {
   const [chatBusy, setChatBusy] = useState(false);
   const [replaceIndex, setReplaceIndex] = useState<number | null>(null);
   const [fontSize, setFontSize] = useState(16);
+  const [fontKey, setFontKey] = useState(DEFAULT_FONT_KEY);
   const [saveState, setSaveState] = useState<'idle' | 'dirty' | 'saved'>(
     'idle',
   );
@@ -438,6 +440,11 @@ export default function EditorScreen({route, navigation}: Props) {
       <StyleBar
         onStyle={(key, value) => editorRef.current?.format(key, value)}
         fontSize={fontSize}
+        font={fontKey}
+        onFontChange={key => {
+          setFontKey(key);
+          editorRef.current?.format('font', key);
+        }}
         onFontSizeChange={s => {
           setFontSize(s);
           editorRef.current?.format('size', `${s}px`);

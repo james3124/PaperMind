@@ -175,3 +175,23 @@ describe('PAPER_RATIOS', () => {
     expect(html).toContain('if (getTableAtSelection()) return;');
   });
 });
+
+describe('font family support', () => {
+  const html = buildQuillHtml('');
+
+  it('registers the class-based font attributor with the shared whitelist', () => {
+    expect(html).toContain("attributors/class/font");
+    expect(html).toContain(
+      JSON.stringify(['georgia', 'times', 'calibri', 'arial', 'verdana', 'mono']),
+    );
+  });
+
+  it('emits a CSS rule per font family with metric-compatible fallbacks', () => {
+    expect(html).toContain('.ql-font-georgia');
+    expect(html).toContain('.ql-font-times');
+    expect(html).toContain('.ql-font-calibri');
+    expect(html).toContain('.ql-font-mono');
+    expect(html).toContain('Carlito');
+    expect(html).toContain("'Liberation Sans'");
+  });
+});
