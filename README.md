@@ -1,10 +1,13 @@
 <h1 align="center">
   <a href="https://github.com/james3124/PaperMind">
-    <img src="https://github.com/james3124/PaperMind/android/app/src/main/res/mipmap-hdpi/ic_launcher.png" alt="PaperMind" width="256" height="256" />
+    <img src="https://raw.githubusercontent.com/james3124/PaperMind/master/android/app/src/main/res/mipmap-hdpi/ic_launcher.png" alt="PaperMind" width="256" height="256" />
   </a>
   <br/>
+  PaperMind
 </h1>
 
+<div align="center">
+  
 **Write, generate, and edit complete academic research papers — entirely on your phone.**
 
 PaperMind is an AI research-paper studio for Android. The entire AI pipeline runs **on-device** by default using a local large language model — so your research stays private and works anywhere, even without an internet connection. Optionally connect **any OpenAI-compatible API** (your own key, your own provider) for faster, higher-quality generation with automatic on-device fallback.
