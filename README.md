@@ -1,9 +1,9 @@
 <h1 align="center">
-  <a href="https://github.com/Zettlr/Zettlr">
-    <img src="n" alt="Zettlr" width="256" height="256" />
+  <a href="https://github.com/james3124/PaperMind">
+    <img src="https://github.com/james3124/PaperMind/android/app/src/main/res/mipmap-hdpi/ic_launcher.png" alt="PaperMind" width="256" height="256" />
   </a>
   <br/>
-  # 📚 PaperMind
+  PaperMind
 </h1>
 <div align="center">
 
