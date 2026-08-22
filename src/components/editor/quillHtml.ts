@@ -20,6 +20,7 @@ const DARK_CSS = `
     table.ql-paper-table td[contenteditable="true"]:focus { outline: 2px solid #818cf8; outline-offset: -2px; }
     hr.ql-page-break { border-top-color: #4b5563; }
     hr.ql-paper-hr { border-top-color: #9ca3af; }
+    .ql-footnote-ref { color: #818cf8; }
   `;
 
 export function buildQuillHtml(
@@ -79,6 +80,8 @@ ${EDITOR_FONTS.map(f => `    .ql-font-${f.key} { font-family: ${f.stack}; }`).jo
     hr.ql-page-break { border: none; border-top: 2px dashed #9ca3af; margin: 20px 0; page-break-after: always; break-after: page; }
     /* PaperMind horizontal rule */
     hr.ql-paper-hr { border: none; border-top: 1px solid #374151; margin: 16px 0; }
+    /* PaperMind footnote marker */
+    .ql-footnote-ref { vertical-align: super; font-size: 0.75em; color: #6366f1; }
   </style>
   <style>${dark ? DARK_CSS : ''}</style>
 </head>
@@ -128,6 +131,22 @@ ${EDITOR_FONTS.map(f => `    .ql-font-${f.key} { font-family: ${f.stack}; }`).jo
     PageBreakBlot.tagName = 'hr';
     PageBreakBlot.className = 'ql-page-break';
 
+    // Inline blot for footnote markers: renders as <sup class="ql-footnote-ref">N</sup>
+    const InlineBlot = Quill.import('blots/inline');
+    class FootnoteRefBlot extends InlineBlot {
+      static create(value) {
+        const node = super.create(value);
+        node.textContent = String(value && value.num != null ? value.num : value);
+        return node;
+      }
+      static value(node) {
+        return { num: parseInt(node.textContent, 10) || 0 };
+      }
+    }
+    FootnoteRefBlot.blotName = 'footnote-ref';
+    FootnoteRefBlot.tagName = 'sup';
+    FootnoteRefBlot.className = 'ql-footnote-ref';
+
     const SpacingAttributor = new BlockStyle('spacing', 'line-height');
 
     // Font size: reuse Quill v2's built-in style size attributor ("size" →
@@ -147,6 +166,7 @@ ${EDITOR_FONTS.map(f => `    .ql-font-${f.key} { font-family: ${f.stack}; }`).jo
 
     Quill.register(PaperTableBlot, true);
     Quill.register(PageBreakBlot, true);
+    Quill.register(FootnoteRefBlot, true);
     Quill.register(SpacingAttributor, true);
 
     const Delta = Quill.import('delta');
@@ -454,6 +474,114 @@ ${EDITOR_FONTS.map(f => `    .ql-font-${f.key} { font-family: ${f.stack}; }`).jo
           quill.focus();
           const pbSel = quill.getSelection(true);
           quill.insertEmbed(pbSel.index, 'page-break', true, 'user');
+          break;
+        }
+
+        // ── NEW: insert a numbered footnote marker at the cursor and rebuild
+        // the footnotes section at document end ──────────────────────────────
+        case 'insertFootnote': {
+          quill.focus();
+          const sel = quill.getSelection();
+          if (!sel) break;
+          if (getTableAtSelection()) break;
+          const index = sel.index;
+          // Count existing markers to number this one.
+          const opsBefore = quill.getContents().ops || [];
+          let num = 0;
+          opsBefore.forEach(op => {
+            if (op.insert && typeof op.insert === 'object' && op.insert['footnote-ref'] != null) num++;
+          });
+          num += 1;
+          quill.insertEmbed(index, 'footnote-ref', {num}, 'user');
+
+          // Locate the 'Footnotes' header line, or create it as last content.
+          let fnPos = -1;
+          let fpos = 0;
+          quill.getContents().ops.forEach(op => {
+            if (typeof op.insert === 'string') {
+              const lines = op.insert.split('\\n');
+              lines.forEach((line, li) => {
+                if (
+                  line.trim().toLowerCase() === 'footnotes' &&
+                  op.attributes && op.attributes.header === 2
+                ) fnPos = fpos;
+                fpos += line.length + (li < lines.length - 1 ? 1 : 0);
+              });
+            } else {
+              fpos += 1;
+            }
+          });
+          if (fnPos === -1) {
+            fnPos = quill.getLength();
+            quill.insertText(fnPos, '\\nFootnotes\\n', 'user');
+            quill.formatLine(fnPos + 1, 0, {header: 2}, 'user');
+          }
+          const afterHeader = fnPos + 'Footnotes'.length + 1;
+          const totalLen = quill.getLength();
+
+          // Parse existing numbered note lines under the header.
+          const existingNotes = [];
+          if (afterHeader < totalLen) {
+            quill.getText(afterHeader, totalLen - afterHeader).split('\\n').forEach(line => {
+              const m = line.match(/^\\d+\\.\\s(.*)$/);
+              if (m) existingNotes.push(m[1]);
+            });
+          }
+          existingNotes.push(String(msg.text == null ? '' : msg.text));
+
+          // Collect all markers left-to-right with their numbers.
+          const markerNums = [];
+          let mpos = 0;
+          quill.getContents().ops.forEach(op => {
+            if (typeof op.insert === 'string') {
+              mpos += op.insert.length;
+            } else if (op.insert && typeof op.insert === 'object') {
+              if (op.insert['footnote-ref'] != null) markerNums.push(op.insert['footnote-ref'].num);
+              mpos += 1;
+            }
+          });
+
+          // Rebuild the whole notes list deterministically from marker order
+          // plus the parsed note texts (new note appended last).
+          suppressChangePosts = true;
+          try {
+            if (afterHeader < totalLen) {
+              quill.deleteText(afterHeader, totalLen - afterHeader, 'user');
+            }
+            const rebuilt = markerNums.map((n, i) => n + '. ' + (existingNotes[i] != null ? existingNotes[i] : ''));
+            quill.insertText(afterHeader, '\\n' + rebuilt.join('\\n'), 'user');
+          } finally {
+            suppressChangePosts = false;
+          }
+          postContentChangeNow();
+          break;
+        }
+
+        // ── NEW: insert a plain-text table of contents at the cursor ────────
+        case 'insertToc': {
+          quill.focus();
+          const tocDelta = quill.getContents();
+          const tocHeadings = [];
+          let tpos = 0;
+          tocDelta.ops.forEach(op => {
+            if (typeof op.insert === 'string') {
+              const lines = op.insert.split('\\n');
+              lines.forEach((line, li) => {
+                if (op.attributes && op.attributes.header) {
+                  tocHeadings.push({ level: op.attributes.header, text: line });
+                }
+                tpos += line.length + (li < lines.length - 1 ? 1 : 0);
+              });
+            } else if (op.insert && typeof op.insert === 'object') {
+              tpos += 1;
+            }
+          });
+          if (tocHeadings.length === 0) break;
+          const tocSel = quill.getSelection(true);
+          const tocLines = tocHeadings.map(h =>
+            h.level === 1 ? h.text : (h.level === 2 ? '  ' + h.text : '    ' + h.text)
+          );
+          quill.insertText(tocSel.index, tocLines.join('\\n'), 'user');
           break;
         }
 

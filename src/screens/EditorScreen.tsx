@@ -9,6 +9,8 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Modal,
+  TextInput,
 } from 'react-native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '@/navigation/AppNavigator';
@@ -17,6 +19,8 @@ import {complete, stream} from '@/services/inference';
 import {useSettingsStore} from '@/stores/settingsStore';
 import {useModelDownloadStore} from '@/stores/modelDownloadStore';
 import {exportAndShareDocx} from '@/services/exportContent';
+import {exportPdf} from '@/services/pdfExport';
+import Share from 'react-native-share';
 import {markdownToDeltaJson} from '@/utils/markdownToQuillDelta';
 import EditorWebView, {EditorRef} from '@/components/editor/EditorWebView';
 import TabToolbar from '@/components/editor/TabToolbar';
@@ -41,6 +45,7 @@ import ColorPaletteModal, {
 } from '@/components/editor/ColorPaletteModal';
 import LinkDialog from '@/components/editor/LinkDialog';
 import TableDialog from '@/components/editor/TableDialog';
+import SnapshotsModal, {SnapshotRow} from '@/components/editor/SnapshotsModal';
 import DocumentPicker from 'react-native-document-picker';
 import RNFS from 'react-native-fs';
 
@@ -87,6 +92,16 @@ export default function EditorScreen({route, navigation}: Props) {
     'idle',
   );
 
+  const [snapshots, setSnapshots] = useState<SnapshotRow[]>([]);
+  const [showSnapshots, setShowSnapshots] = useState(false);
+  const [snapshotBusy, setSnapshotBusy] = useState(false);
+  const [showFootnote, setShowFootnote] = useState(false);
+  const [footnoteText, setFootnoteText] = useState('');
+
+  const lastDeltaRef = useRef<string | null>(null);
+  const lastSnapshottedContentRef = useRef<string | null>(null);
+  const wordCountRef = useRef(0);
+
   const paperSize = useSettingsStore(s => s.paperSize);
   const setPaperSize = useSettingsStore(s => s.setPaperSize);
   const enabledSources = useSettingsStore(s => s.enabledSources);
@@ -95,7 +110,7 @@ export default function EditorScreen({route, navigation}: Props) {
   const isDark = theme === 'dark';
   const modelReady = useModelDownloadStore(s => s.modelReady);
 
-  useEffect(() => {
+  const loadDocument = useCallback(() => {
     setSaveState('idle');
     documentRepository.getById(documentId).then(doc => {
       if (doc) {
@@ -122,6 +137,10 @@ export default function EditorScreen({route, navigation}: Props) {
   }, [documentId]);
 
   useEffect(() => {
+    loadDocument();
+  }, [loadDocument]);
+
+  useEffect(() => {
     return () => {
       if (saveTimer.current) {
         clearTimeout(saveTimer.current);
@@ -131,6 +150,8 @@ export default function EditorScreen({route, navigation}: Props) {
 
   const onContentChange = useCallback(
     (delta: string, wc: number) => {
+      lastDeltaRef.current = delta;
+      wordCountRef.current = wc;
       setSaveStatus('unsaved');
       setWordCount(wc);
       if (saveTimer.current) {
@@ -147,6 +168,135 @@ export default function EditorScreen({route, navigation}: Props) {
     },
     [documentId],
   );
+
+  const refreshSnapshots = useCallback(async () => {
+    try {
+      const list = await documentRepository.listSnapshots(documentId);
+      setSnapshots(
+        list.map(r => ({
+          id: r.id,
+          wordCount: r.wordCount,
+          createdAt: r.createdAt,
+          label: r.label,
+        })),
+      );
+    } catch {
+      setSnapshots([]);
+    }
+  }, [documentId]);
+
+  const openSnapshots = useCallback(() => {
+    void refreshSnapshots();
+    setShowSnapshots(true);
+  }, [refreshSnapshots]);
+
+  const handleSnapshotNow = useCallback(() => {
+    if (snapshotBusy) {
+      return;
+    }
+    setSnapshotBusy(true);
+    editorRef.current?.getContent(delta => {
+      void (async () => {
+        try {
+          await documentRepository.createSnapshot(
+            documentId,
+            delta,
+            wordCountRef.current,
+          );
+          lastSnapshottedContentRef.current = delta;
+          await refreshSnapshots();
+        } catch (e: unknown) {
+          Alert.alert(
+            'Snapshot failed',
+            e instanceof Error ? e.message : 'Unknown error',
+          );
+        } finally {
+          setSnapshotBusy(false);
+        }
+      })();
+    });
+  }, [snapshotBusy, documentId, refreshSnapshots]);
+
+  const handleRestoreSnapshot = useCallback(
+    (revisionId: string) => {
+      Alert.alert(
+        'Restore this version?',
+        'Current unsaved changes stay in the editor until reload.',
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {
+            text: 'Restore',
+            style: 'destructive',
+            onPress: () => {
+              void (async () => {
+                try {
+                  await documentRepository.restoreSnapshot(
+                    documentId,
+                    revisionId,
+                  );
+                  setShowSnapshots(false);
+                  loadDocument();
+                } catch (e: unknown) {
+                  Alert.alert(
+                    'Restore failed',
+                    e instanceof Error ? e.message : 'Unknown error',
+                  );
+                }
+              })();
+            },
+          },
+        ],
+      );
+    },
+    [documentId, loadDocument],
+  );
+
+  const handleDeleteSnapshot = useCallback(
+    (revisionId: string) => {
+      void (async () => {
+        try {
+          await documentRepository.deleteSnapshot(revisionId);
+          await refreshSnapshots();
+        } catch (e: unknown) {
+          Alert.alert(
+            'Delete failed',
+            e instanceof Error ? e.message : 'Unknown error',
+          );
+        }
+      })();
+    },
+    [refreshSnapshots],
+  );
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const delta = lastDeltaRef.current;
+      if (!delta || delta === lastSnapshottedContentRef.current) {
+        return;
+      }
+      void documentRepository
+        .createSnapshot(documentId, delta, wordCountRef.current)
+        .then(() => {
+          lastSnapshottedContentRef.current = delta;
+        })
+        .catch(() => {});
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [documentId]);
+
+  const handleInsertToc = useCallback(() => {
+    editorRef.current?.insertToc();
+  }, []);
+
+  const applyFootnote = useCallback(() => {
+    const text = footnoteText.trim();
+    if (!text) {
+      return;
+    }
+    editorRef.current?.insertFootnote(text);
+    setFootnoteText('');
+    setShowFootnote(false);
+  }, [footnoteText]);
 
   const onFormatChange = useCallback(
     (f: Record<string, unknown>) => setFormat(f),
@@ -210,6 +360,26 @@ export default function EditorScreen({route, navigation}: Props) {
       try {
         const text = extractPlainText(delta);
         await exportAndShareDocx(title || 'Untitled', text);
+      } catch (e: unknown) {
+        Alert.alert(
+          'Export failed',
+          e instanceof Error ? e.message : 'Unknown error',
+        );
+      } finally {
+        setExporting(false);
+      }
+    });
+  }, [exporting, title]);
+
+  const handleExportPdf = useCallback(() => {
+    if (exporting) {
+      return;
+    }
+    setExporting(true);
+    editorRef.current?.getContent(async delta => {
+      try {
+        const filePath = await exportPdf(title || 'Untitled', delta);
+        await Share.open({url: `file://${filePath}`, type: 'application/pdf'});
       } catch (e: unknown) {
         Alert.alert(
           'Export failed',
@@ -382,7 +552,19 @@ export default function EditorScreen({route, navigation}: Props) {
         </Text>
         <Text style={styles.saveStatus}>{saveIndicator}</Text>
         {exporting && <ActivityIndicator size="small" color="#6366f1" />}
-        <TouchableOpacity onPress={handleExport} disabled={exporting}>
+        <TouchableOpacity
+          onPress={() => {
+            Alert.alert(
+              'Export',
+              title || 'Untitled',
+              [
+                {text: 'Word (.docx)', onPress: handleExport},
+                {text: 'PDF', onPress: handleExportPdf},
+                {text: 'Cancel', style: 'cancel'},
+              ],
+            );
+          }}
+          disabled={exporting}>
           <Text style={styles.iconBtn}>📤</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -394,6 +576,17 @@ export default function EditorScreen({route, navigation}: Props) {
         </TouchableOpacity>
         <TouchableOpacity onPress={handleOutline}>
           <Text style={styles.iconBtn}>☰</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => editorRef.current?.insertToc()}>
+          <Text style={[styles.toolBtn, isDark && styles.darkText]}>TOC</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setShowFootnote(true)}>
+          <Text style={[styles.toolBtn, isDark && styles.darkText]}>
+            Footnote
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={openSnapshots}>
+          <Text style={styles.iconBtn}>🕘</Text>
         </TouchableOpacity>
       </View>
 
@@ -594,6 +787,54 @@ export default function EditorScreen({route, navigation}: Props) {
         onApply={handleChatApply}
         onDismiss={() => setShowChat(false)}
       />
+
+      <SnapshotsModal
+        visible={showSnapshots}
+        snapshots={snapshots}
+        busy={snapshotBusy}
+        onSnapshotNow={handleSnapshotNow}
+        onRestore={handleRestoreSnapshot}
+        onDelete={handleDeleteSnapshot}
+        onDismiss={() => setShowSnapshots(false)}
+      />
+
+      <Modal
+        visible={showFootnote}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFootnote(false)}>
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setShowFootnote(false)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View style={styles.footnoteSheet}>
+              <Text style={styles.footnoteTitle}>Insert Footnote</Text>
+              <TextInput
+                style={styles.footnoteInput}
+                value={footnoteText}
+                onChangeText={setFootnoteText}
+                placeholder="Footnote text"
+                multiline
+                autoFocus
+              />
+              <View style={styles.footnoteRow}>
+                <View style={styles.flex} />
+                <TouchableOpacity
+                  style={styles.footnoteCancel}
+                  onPress={() => setShowFootnote(false)}>
+                  <Text style={styles.footnoteCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.footnoteApply}
+                  onPress={applyFootnote}>
+                  <Text style={styles.footnoteApplyText}>Apply</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -645,6 +886,41 @@ const styles = StyleSheet.create({
   saveChipSaved: {backgroundColor: '#10b981'},
   saveChipText: {color: '#fff', fontSize: 11, fontWeight: '600'},
   darkBg: {backgroundColor: '#111827'},
+  toolBtn: {fontSize: 12, fontWeight: '600', color: '#6366f1'},
+  overlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  footnoteSheet: {width: 300, backgroundColor: '#fff', borderRadius: 16, padding: 16},
+  footnoteTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  footnoteInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+    minHeight: 60,
+    textAlignVertical: 'top',
+    marginBottom: 12,
+  },
+  footnoteRow: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  footnoteCancel: {paddingHorizontal: 12, paddingVertical: 8},
+  footnoteCancelText: {fontSize: 13, color: '#6b7280'},
+  footnoteApply: {
+    backgroundColor: '#6366f1',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  footnoteApplyText: {fontSize: 13, color: '#fff', fontWeight: '600'},
   darkSurface: {backgroundColor: '#1f2937', borderTopColor: '#374151', borderBottomColor: '#374151'},
   darkText: {color: '#e5e7eb'},
 });

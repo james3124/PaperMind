@@ -1,9 +1,11 @@
 import {Q} from '@nozbe/watermelondb';
 import {database} from './database';
 import Document, {DocumentStatus} from './models/Document';
+import DocumentRevision from './models/DocumentRevision';
 import {SourcePaper} from '@/services/literatureSearch';
 
 const collection = database.get<Document>('documents');
+const revisionsCollection = database.get<DocumentRevision>('document_revisions');
 
 export const documentRepository = {
   getAll() {
@@ -121,6 +123,49 @@ export const documentRepository = {
     const doc = await collection.find(id);
     await database.write(async () => {
       await doc.destroyPermanently();
+    });
+  },
+
+  async createSnapshot(
+    id: string,
+    content: string,
+    wordCount: number,
+  ): Promise<DocumentRevision> {
+    return await database.write(async () => {
+      return await revisionsCollection.create(revision => {
+        revision.documentId = id;
+        revision.content = content;
+        revision.wordCount = wordCount;
+        revision.createdAt = Date.now();
+      });
+    });
+  },
+
+  async listSnapshots(id: string): Promise<DocumentRevision[]> {
+    return await revisionsCollection
+      .query(Q.where('document_id', id), Q.sortBy('created_at', Q.desc))
+      .fetch();
+  },
+
+  async restoreSnapshot(documentId: string, revisionId: string): Promise<void> {
+    const revision = await revisionsCollection.find(revisionId);
+    if (revision.documentId !== documentId) {
+      throw new Error('Revision does not belong to this document');
+    }
+    const doc = await collection.find(documentId);
+    await database.write(async () => {
+      await doc.update(d => {
+        d.content = revision.content;
+        d.wordCount = revision.wordCount;
+        d.updatedAt = new Date();
+      });
+    });
+  },
+
+  async deleteSnapshot(revisionId: string): Promise<void> {
+    const revision = await revisionsCollection.find(revisionId);
+    await database.write(async () => {
+      await revision.destroyPermanently();
     });
   },
 };

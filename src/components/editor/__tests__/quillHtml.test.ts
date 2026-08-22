@@ -176,6 +176,42 @@ describe('PAPER_RATIOS', () => {
   });
 });
 
+describe('footnotes and table of contents', () => {
+  const light = buildQuillHtml('');
+  const dark = buildQuillHtml('', 'a4', {dark: true});
+
+  it('registers an inline footnote-ref blot via blots/inline', () => {
+    expect(light).toContain("'blots/inline'");
+    expect(light).toContain('FootnoteRefBlot.blotName');
+    expect(light).toContain("FootnoteRefBlot.blotName = 'footnote-ref'");
+    expect(light).toContain("FootnoteRefBlot.tagName = 'sup'");
+    expect(light).toContain("FootnoteRefBlot.className = 'ql-footnote-ref'");
+    expect(light).toContain('Quill.register(FootnoteRefBlot, true)');
+  });
+
+  it('emits footnote CSS with a dark override', () => {
+    expect(light).toContain('.ql-footnote-ref');
+    expect(light).toContain('.ql-footnote-ref { vertical-align: super; font-size: 0.75em; color: #6366f1; }');
+    expect(dark).toContain('.ql-footnote-ref { color: #818cf8; }');
+  });
+
+  it('embeds insertFootnote command handler', () => {
+    expect(light).toContain("case 'insertFootnote'");
+    expect(light).toContain("quill.insertEmbed(index, 'footnote-ref', {num}, 'user')");
+    expect(light).toContain('msg.text');
+  });
+
+  it('insertFootnote skips when there is no selection or inside a table', () => {
+    expect(light).toContain('if (!sel) break;');
+    expect(light).toMatch(/if \(!sel\) break;\s*\n\s*if \(getTableAtSelection\(\)\) break;/);
+  });
+
+  it('embeds insertToc command handler traversing headings like getHeadings', () => {
+    expect(light).toContain("case 'insertToc'");
+    expect(light).toContain('{ level: op.attributes.header, text: line }');
+  });
+});
+
 describe('font family support', () => {
   const html = buildQuillHtml('');
 

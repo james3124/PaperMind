@@ -34,6 +34,8 @@ export interface EditorRef {
     newMarker: string,
   ) => void;
   replaceReferences: (entries: string[]) => void;
+  insertToc: () => void;
+  insertFootnote: (text: string) => void;
 }
 
 interface Props {
@@ -97,6 +99,8 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
     replaceCitationMarkers: (index, oldMarker, newMarker) =>
       postCmd({cmd: 'replaceCitationMarkers', index, oldMarker, newMarker}),
     replaceReferences: entries => postCmd({cmd: 'replaceReferences', entries}),
+    insertToc: () => postCmd({cmd: 'insertToc'}),
+    insertFootnote: text => postCmd({cmd: 'insertFootnote', text}),
   }));
 
   function onMessage(event: WebViewMessageEvent) {
