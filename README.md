@@ -3,10 +3,7 @@
     <img src="https://github.com/james3124/PaperMind/android/app/src/main/res/mipmap-hdpi/ic_launcher.png" alt="PaperMind" width="256" height="256" />
   </a>
   <br/>
-  PaperMind
 </h1>
-<div align="center">
-
 
 **Write, generate, and edit complete academic research papers — entirely on your phone.**
 
