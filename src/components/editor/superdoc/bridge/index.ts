@@ -9,8 +9,16 @@ import {
   findAllOccurrences,
   type HeadingNode,
 } from './docQueries';
+import {
+  footnoteContent,
+  resolveFootnoteSchema,
+  tocParagraphs,
+} from './tocFootnotes';
 
 const tracker = createSaveStateTracker();
+// Highest footnote number handed out in this document session; reset on
+// every load/loadBlank so renumbering starts at 1 for each new document.
+let footnotesUsed = 0;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 const pendingExports = new Map<string, (b64: string) => void>();
 
@@ -253,9 +261,11 @@ window.__handleMessage = (data: string) => {
     return;
   }
   if (cmd.cmd === 'load' && typeof cmd.b64 === 'string') {
+    footnotesUsed = 0;
     window.__mount!(cmd.b64);
   }
   if (cmd.cmd === 'loadBlank') {
+    footnotesUsed = 0;
     window.__mount!();
   }
   if (cmd.cmd === 'exportNow') {
@@ -487,6 +497,50 @@ window.__handleMessage = (data: string) => {
         post({type: 'cmd-error', cmd: 'replaceReferences'});
         post({type: 'error', message: String(e)});
         post({type: 'replace-done', count: 0});
+      }
+      break;
+    }
+    case 'insertToc': {
+      const ed = getEditor();
+      if (!ed) {
+        post({type: 'cmd-error', cmd: 'insertToc'});
+        break;
+      }
+      try {
+        const headings = collectHeadings(
+          ed.state.doc.content.content as HeadingNode[],
+        );
+        // Legacy parity: a document with no headings gets no TOC.
+        if (headings.length > 0) {
+          ed.commands.insertContent(tocParagraphs(headings));
+        }
+      } catch (e: unknown) {
+        post({type: 'cmd-error', cmd: 'insertToc'});
+        post({type: 'error', message: String(e)});
+      }
+      break;
+    }
+    case 'insertFootnote': {
+      const ed = getEditor();
+      if (!ed || typeof cmd.text !== 'string') {
+        post({type: 'cmd-error', cmd: 'insertFootnote'});
+        break;
+      }
+      try {
+        const shape = resolveFootnoteSchema(ed.state.schema);
+        if (shape.hasFootnoteNode) {
+          // Native footnote node numbers itself; the manual counter stays
+          // untouched so it never drifts if both paths are ever mixed.
+          ed.commands.insertContent(footnoteContent(0, cmd.text, shape));
+        } else {
+          footnotesUsed += 1;
+          ed.commands.insertContent(
+            footnoteContent(footnotesUsed, cmd.text, shape),
+          );
+        }
+      } catch (e: unknown) {
+        post({type: 'cmd-error', cmd: 'insertFootnote'});
+        post({type: 'error', message: String(e)});
       }
       break;
     }
