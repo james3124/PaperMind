@@ -2,8 +2,9 @@ import {SuperDoc} from 'superdoc';
 import 'superdoc/style.css';
 
 import {blobToBase64} from './exporter';
+import {createSaveStateTracker} from './saveState';
 
-let dirty = false;
+const tracker = createSaveStateTracker();
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 const pendingExports = new Map<string, (b64: string) => void>();
 
@@ -20,6 +21,7 @@ async function serializeAndPost(
   if (!sd) {
     return;
   }
+  tracker.beginExport();
   try {
     const result = await sd.export({
       exportType: ['docx'],
@@ -29,7 +31,7 @@ async function serializeAndPost(
       throw new Error('export did not return a Blob');
     }
     const b64 = await blobToBase64(result);
-    dirty = false;
+    tracker.markSaved();
     post({type: 'save-state', state: 'saved'});
     if (kind === 'autosave') {
       post({type: 'docx-autosave', b64});
@@ -40,18 +42,63 @@ async function serializeAndPost(
   } catch (e: unknown) {
     // failed export must never clear dirty state
     post({type: 'error', message: String(e)});
+    if (kind === 'reply' && requestId != null) {
+      // release the caller so it can retry cleanly instead of hanging
+      pendingExports.delete(requestId);
+      post({type: 'cmd-error', cmd: 'exportNow', requestId});
+    }
+  } finally {
+    // edits made while the export was in flight must not be marked saved
+    if (tracker.endExportStaleEdits()) {
+      markDirty();
+    }
   }
 }
 
 function markDirty(): void {
-  if (!dirty) {
-    dirty = true;
+  const wasClean = !tracker.isDirty();
+  tracker.edit();
+  if (wasClean) {
     post({type: 'save-state', state: 'dirty'});
   }
   if (saveTimer) {
     clearTimeout(saveTimer);
   }
   saveTimer = setTimeout(() => void serializeAndPost('autosave'), 2000);
+}
+
+function emitWordCount(ed: any): void {
+  const text = ed.state.doc.textBetween(
+    0,
+    ed.state.doc.content.size,
+    '\n',
+    ' ',
+  );
+  post({
+    type: 'content-change',
+    wordCount: text.split(/\s+/).filter(Boolean).length,
+  });
+}
+
+let listenersAttached = false;
+
+function attachEditorListeners(attempt = 0): void {
+  const ed = getEditor();
+  if (!ed) {
+    // editors register asynchronously on ready; poll briefly as a fallback
+    if (attempt < 50) {
+      setTimeout(() => attachEditorListeners(attempt + 1), 100);
+    }
+    return;
+  }
+  if (listenersAttached) {
+    return;
+  }
+  listenersAttached = true;
+  ed.on('update', () => {
+    markDirty();
+    emitWordCount(ed);
+  });
 }
 
 export function post(msg: Record<string, unknown>): void {
@@ -81,28 +128,19 @@ window.__mount = (b64: string) => {
     toolbar: '#superdoc-toolbar',
     documentMode: 'editing',
     document: blob,
-    onReady: () => post({type: 'ready'}),
+    onReady: () => {
+      attachEditorListeners();
+      const ed = getEditor();
+      if (ed) {
+        emitWordCount(ed);
+      }
+      post({type: 'ready'});
+    },
     onContentError: ({error}: any) =>
       post({type: 'error', message: String(error)}),
     onException: ({error}: any) =>
       post({type: 'error', message: String(error)}),
   });
-  const ed = getEditor();
-  if (ed) {
-    ed.on('update', () => {
-      markDirty();
-      const text = ed.state.doc.textBetween(
-        0,
-        ed.state.doc.content.size,
-        '\n',
-        ' ',
-      );
-      post({
-        type: 'content-change',
-        wordCount: text.split(/\s+/).filter(Boolean).length,
-      });
-    });
-  }
 };
 
 window.__handleMessage = (data: string) => {
