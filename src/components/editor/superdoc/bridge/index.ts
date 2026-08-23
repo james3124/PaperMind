@@ -2,6 +2,7 @@ import {SuperDoc} from 'superdoc';
 import 'superdoc/style.css';
 
 import {blobToBase64} from './exporter';
+import {applyFormat, currentFormats} from './formatCommands';
 import {createSaveStateTracker} from './saveState';
 
 const tracker = createSaveStateTracker();
@@ -109,6 +110,12 @@ function attachEditorListeners(attempt = 0): void {
     markDirty();
     emitWordCount(ed);
   });
+  // Toolbar state must track the caret/selection; also emit once right
+  // after attach so StyleBar highlights are correct before any navigation.
+  ed.on('selectionUpdate', () =>
+    post({type: 'format-change', format: currentFormats(ed)}),
+  );
+  post({type: 'format-change', format: currentFormats(ed)});
 }
 
 export function post(msg: Record<string, unknown>): void {
@@ -176,5 +183,40 @@ window.__handleMessage = (data: string) => {
       post({type: 'docx', b64, requestId}),
     );
     void serializeAndPost('reply', requestId);
+  }
+  switch (cmd.cmd) {
+    case 'format': {
+      const ed = getEditor();
+      if (!ed || !applyFormat(ed, cmd.key, cmd.value)) {
+        post({type: 'cmd-error', cmd: 'format'});
+      }
+      break;
+    }
+    case 'insertText': {
+      const ed = getEditor();
+      if (ed) {
+        ed.commands.insertContent(cmd.text);
+      }
+      break;
+    }
+    case 'undo':
+    case 'redo': {
+      const ed = getEditor();
+      if (ed) {
+        ed.commands[cmd.cmd]();
+      }
+      break;
+    }
+    case 'insertImage': {
+      const ed = getEditor();
+      if (ed && typeof cmd.dataUrl === 'string') {
+        ed.commands.setImage({src: cmd.dataUrl});
+      }
+      break;
+    }
+    case 'setTheme': {
+      document.body.classList.toggle('dark', cmd.dark === true);
+      break;
+    }
   }
 };
