@@ -205,8 +205,14 @@ export default function EditorScreen({route, navigation}: Props) {
   // Exports/chat need the current paper text; getContent now yields docx
   // base64, so round-trip it through a temp file and extract the text.
   const getPaperText = useCallback(async (): Promise<string> => {
+    const editor = editorRef.current;
+    if (!editor) {
+      // Editor not mounted (e.g. document row not loaded yet) — fail fast
+      // instead of leaving callers awaiting a callback that never fires.
+      return '';
+    }
     const b64 = await new Promise<string>(resolve => {
-      editorRef.current?.getContent(resolve);
+      editor.getContent(resolve);
     });
     if (!b64) {
       return '';

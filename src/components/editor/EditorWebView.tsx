@@ -60,9 +60,10 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
   );
   const requestSeq = useRef(0);
   const queueRef = useRef<Record<string, unknown>[]>([]);
+  const blankBootstrappedRef = useRef(false);
 
   function postCmd(cmd: Record<string, unknown>) {
-    if (!readyRef.current && cmd.cmd !== 'load') {
+    if (!readyRef.current && cmd.cmd !== 'load' && cmd.cmd !== 'loadBlank') {
       queueRef.current.push(cmd);
       return;
     }
@@ -106,6 +107,20 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Blank mode: nothing was loaded from disk, so bootstrap a blank DOCX as
+  // soon as the bridge script exists — otherwise SuperDoc never mounts and
+  // 'ready' (plus the queued-command replay) never happens.
+  function handleLoadEnd() {
+    if (
+      !blankBootstrappedRef.current &&
+      props.blankMode &&
+      initialB64Ref.current == null
+    ) {
+      blankBootstrappedRef.current = true;
+      postCmd({cmd: 'loadBlank'});
+    }
+  }
 
   useImperativeHandle(ref, () => ({
     format: (key, value) => postCmd({cmd: 'format', key, value}),
@@ -184,7 +199,13 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
         }
         case 'ready':
           readyRef.current = true;
-          if (initialB64Ref.current == null && props.blankMode) {
+          if (
+            !blankBootstrappedRef.current &&
+            initialB64Ref.current == null &&
+            props.blankMode
+          ) {
+            // Fallback in case onLoadEnd raced the bridge script load.
+            blankBootstrappedRef.current = true;
             postCmd({cmd: 'loadBlank'});
           }
           queueRef.current.forEach(postCmd);
@@ -206,6 +227,7 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
       allowFileAccess={true}
       onlyArchivedExtension={false}
       onMessage={onMessage}
+      onLoadEnd={handleLoadEnd}
       keyboardDisplayRequiresUserAction={false}
       scalesPageToFit={Platform.OS === 'ios'}
       scrollEnabled={true}
