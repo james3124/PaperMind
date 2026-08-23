@@ -124,6 +124,31 @@ function replaceEverywhere(ed: any, find: string, replace: string): number {
   return positions.length;
 }
 
+/**
+ * Start offset + size of the top-level "References" heading, or null when
+ * absent. Match is case-insensitive on trimmed text so DOCX round-trips
+ * with stray whitespace or casing drift still resolve.
+ */
+function findReferencesHeading(ed: any): {offset: number; size: number} | null {
+  let found: {offset: number; size: number} | null = null;
+  ed.state.doc.forEach((node: any, offset: number) => {
+    if (
+      node.type.name === 'heading' &&
+      /^references$/i.test(node.textContent.trim())
+    ) {
+      found = {offset, size: node.nodeSize};
+    }
+  });
+  return found;
+}
+
+function citationEntryParas(entries: string[]): Array<Record<string, unknown>> {
+  return entries.map(text => ({
+    type: 'paragraph',
+    content: [{type: 'text', text}],
+  }));
+}
+
 function scrollToBlock(ed: any, blockIndex: number): void {
   let seen = 0;
   let targetPos = -1;
@@ -396,6 +421,72 @@ window.__handleMessage = (data: string) => {
       } catch (e: unknown) {
         post({type: 'cmd-error', cmd: 'findReplace'});
         post({type: 'error', message: String(e)});
+      }
+      break;
+    }
+    case 'replaceCitationMarkers': {
+      // Citation markers are inserted programmatically as single text runs
+      // (CitationManagerModal flow), so per-node scanning is safe; markers
+      // split across runs by partial formatting will not match here.
+      const ed = getEditor();
+      if (!ed || typeof cmd.oldMarker !== 'string') {
+        post({type: 'cmd-error', cmd: 'replaceCitationMarkers'});
+        post({type: 'replace-done', count: 0});
+        break;
+      }
+      try {
+        const count = replaceEverywhere(
+          ed,
+          cmd.oldMarker,
+          typeof cmd.newMarker === 'string' ? cmd.newMarker : '',
+        );
+        post({type: 'replace-done', count});
+      } catch (e: unknown) {
+        post({type: 'cmd-error', cmd: 'replaceCitationMarkers'});
+        post({type: 'error', message: String(e)});
+        post({type: 'replace-done', count: 0});
+      }
+      break;
+    }
+    case 'replaceReferences': {
+      const ed = getEditor();
+      if (!ed || !Array.isArray(cmd.entries)) {
+        post({type: 'cmd-error', cmd: 'replaceReferences'});
+        post({type: 'replace-done', count: 0});
+        break;
+      }
+      try {
+        const entries: string[] = cmd.entries.map(String);
+        const heading = findReferencesHeading(ed);
+        if (heading) {
+          // wipe everything after the heading, then rebuild the list.
+          // (heading.offset + heading.size = first position past the
+          // heading node; deleting to content.size clears the tail.)
+          const from = heading.offset + heading.size;
+          ed.view.dispatch(
+            ed.state.tr.delete(from, Math.max(from, ed.state.doc.content.size)),
+          );
+          if (entries.length > 0) {
+            ed.commands.insertContentAt(from, citationEntryParas(entries));
+          }
+        } else {
+          // Deviation from plan: no References section exists (e.g. blank
+          // doc or renamed heading), so append one at document end instead
+          // of silently dropping the entries.
+          ed.commands.insertContentAt(ed.state.doc.content.size, [
+            {
+              type: 'heading',
+              attrs: {level: 1},
+              content: [{type: 'text', text: 'References'}],
+            },
+            ...citationEntryParas(entries),
+          ]);
+        }
+        post({type: 'replace-done', count: entries.length});
+      } catch (e: unknown) {
+        post({type: 'cmd-error', cmd: 'replaceReferences'});
+        post({type: 'error', message: String(e)});
+        post({type: 'replace-done', count: 0});
       }
       break;
     }
