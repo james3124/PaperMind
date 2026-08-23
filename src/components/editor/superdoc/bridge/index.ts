@@ -19,9 +19,14 @@ async function serializeAndPost(
 ): Promise<void> {
   const sd = (window as any).__sd;
   if (!sd) {
+    if (kind === 'reply' && requestId != null) {
+      pendingExports.delete(requestId);
+      post({type: 'cmd-error', cmd: 'exportNow', requestId});
+    }
     return;
   }
   tracker.beginExport();
+  let succeeded = false;
   try {
     const result = await sd.export({
       exportType: ['docx'],
@@ -32,13 +37,13 @@ async function serializeAndPost(
     }
     const b64 = await blobToBase64(result);
     tracker.markSaved();
-    post({type: 'save-state', state: 'saved'});
     if (kind === 'autosave') {
       post({type: 'docx-autosave', b64});
     } else {
       pendingExports.get(requestId!)?.(b64);
       pendingExports.delete(requestId!);
     }
+    succeeded = true;
   } catch (e: unknown) {
     // failed export must never clear dirty state
     post({type: 'error', message: String(e)});
@@ -48,9 +53,12 @@ async function serializeAndPost(
       post({type: 'cmd-error', cmd: 'exportNow', requestId});
     }
   } finally {
-    // edits made while the export was in flight must not be marked saved
-    if (tracker.endExportStaleEdits()) {
+    const stale = tracker.endExportStaleEdits();
+    if (stale) {
+      // edits raced with this export; surface dirty instead of a stale saved
       markDirty();
+    } else if (succeeded) {
+      post({type: 'save-state', state: 'saved'});
     }
   }
 }
@@ -88,6 +96,8 @@ function attachEditorListeners(attempt = 0): void {
     // editors register asynchronously on ready; poll briefly as a fallback
     if (attempt < 50) {
       setTimeout(() => attachEditorListeners(attempt + 1), 100);
+    } else {
+      post({type: 'error', message: 'editor listeners failed to attach'});
     }
     return;
   }

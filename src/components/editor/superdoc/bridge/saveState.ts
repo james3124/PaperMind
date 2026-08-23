@@ -8,13 +8,13 @@ export interface SaveStateTracker {
 
 export function createSaveStateTracker(): SaveStateTracker {
   let dirty = false;
-  let exporting = false;
+  let inflightExports = 0;
   let editedDuringExport = false;
 
   return {
     isDirty: () => dirty,
     edit() {
-      if (exporting) {
+      if (inflightExports > 0) {
         editedDuringExport = true;
       }
       dirty = true;
@@ -23,13 +23,14 @@ export function createSaveStateTracker(): SaveStateTracker {
       dirty = false;
     },
     beginExport() {
-      exporting = true;
-      editedDuringExport = false;
+      inflightExports += 1;
     },
     endExportStaleEdits() {
-      exporting = false;
       const stale = editedDuringExport;
-      editedDuringExport = false;
+      inflightExports = Math.max(0, inflightExports - 1);
+      if (inflightExports === 0) {
+        editedDuringExport = false;
+      }
       return stale;
     },
   };
