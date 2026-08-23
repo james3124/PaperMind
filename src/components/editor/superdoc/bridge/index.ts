@@ -4,6 +4,11 @@ import 'superdoc/style.css';
 import {blobToBase64} from './exporter';
 import {applyFormat, currentFormats} from './formatCommands';
 import {createSaveStateTracker} from './saveState';
+import {
+  collectHeadings,
+  findAllOccurrences,
+  type HeadingNode,
+} from './docQueries';
 
 const tracker = createSaveStateTracker();
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -90,6 +95,57 @@ function emitWordCount(ed: any): void {
 }
 
 let listenersAttached = false;
+
+/**
+ * Replaces every occurrence of `find` with `replace` across all text nodes.
+ * Positions are collected first from the current immutable doc snapshot,
+ * then applied bottom-up so each replacement cannot shift the offsets of
+ * the ones still pending. Count = replacements actually dispatched.
+ */
+function replaceEverywhere(ed: any, find: string, replace: string): number {
+  if (!find) {
+    return 0;
+  }
+  const positions: Array<{from: number; to: number}> = [];
+  ed.state.doc.descendants((node: any, pos: number) => {
+    if (node.isText && typeof node.text === 'string') {
+      findAllOccurrences(node.text, find).forEach((offset: number) => {
+        positions.push({from: pos + offset, to: pos + offset + find.length});
+      });
+    }
+  });
+  positions
+    .reverse()
+    .forEach(({from, to}) =>
+      ed.view.dispatch(
+        ed.state.tr.replaceWith(from, to, ed.schema.text(replace)),
+      ),
+    );
+  return positions.length;
+}
+
+function scrollToBlock(ed: any, blockIndex: number): void {
+  let seen = 0;
+  let targetPos = -1;
+  ed.state.doc.forEach((node: HeadingNode, offset: number) => {
+    if (seen === blockIndex) {
+      targetPos = offset + 1;
+    }
+    seen += 1;
+  });
+  if (targetPos < 0) {
+    targetPos = 1;
+  }
+  // prosemirror-state is bundled inside superdoc and not directly
+  // importable, so use the live selection's constructor (TextSelection
+  // or a subclass) which carries the static .near resolver.
+  const SelCtor = ed.state.selection.constructor;
+  ed.view.dispatch(
+    ed.state.tr
+      .setSelection(SelCtor.near(ed.state.doc.resolve(targetPos)))
+      .scrollIntoView(),
+  );
+}
 
 function attachEditorListeners(attempt = 0): void {
   const ed = getEditor();
@@ -289,6 +345,58 @@ window.__handleMessage = (data: string) => {
         sizes.a4;
       document.documentElement.style.setProperty('--page-width', w);
       document.documentElement.style.setProperty('--page-height', h);
+      break;
+    }
+    case 'getHeadings': {
+      const ed = getEditor();
+      if (!ed) {
+        post({type: 'cmd-error', cmd: 'getHeadings'});
+        post({type: 'headings', headings: []});
+        break;
+      }
+      try {
+        const headings = collectHeadings(
+          ed.state.doc.content.content as HeadingNode[],
+        );
+        post({type: 'headings', headings});
+      } catch (e: unknown) {
+        post({type: 'cmd-error', cmd: 'getHeadings'});
+        post({type: 'error', message: String(e)});
+      }
+      break;
+    }
+    case 'scrollTo': {
+      const ed = getEditor();
+      if (!ed) {
+        post({type: 'cmd-error', cmd: 'scrollTo'});
+        break;
+      }
+      try {
+        scrollToBlock(ed, Number(cmd.index));
+      } catch (e: unknown) {
+        post({type: 'cmd-error', cmd: 'scrollTo'});
+        post({type: 'error', message: String(e)});
+      }
+      break;
+    }
+    case 'findReplace': {
+      const ed = getEditor();
+      if (!ed || typeof cmd.find !== 'string' || cmd.find.length === 0) {
+        post({type: 'cmd-error', cmd: 'findReplace'});
+        post({type: 'replace-done', count: 0});
+        break;
+      }
+      try {
+        const count = replaceEverywhere(
+          ed,
+          cmd.find,
+          typeof cmd.replace === 'string' ? cmd.replace : '',
+        );
+        post({type: 'replace-done', count});
+      } catch (e: unknown) {
+        post({type: 'cmd-error', cmd: 'findReplace'});
+        post({type: 'error', message: String(e)});
+      }
       break;
     }
   }
