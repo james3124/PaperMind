@@ -101,9 +101,6 @@ function emitWordCount(ed: any): void {
     wordCount: text.split(/\s+/).filter(Boolean).length,
   });
 }
-
-let listenersAttached = false;
-
 /**
  * Replaces every occurrence of `find` with `replace` across all text nodes.
  * Positions are collected first from the current immutable doc snapshot,
@@ -180,6 +177,11 @@ function scrollToBlock(ed: any, blockIndex: number): void {
   );
 }
 
+// Editor instances already wired with update/selectionUpdate listeners.
+// Keyed per instance (not a module boolean) so every remount gets fresh
+// wiring while double-attaching to the same editor stays impossible.
+const wiredEditors = new WeakSet<object>();
+
 function attachEditorListeners(attempt = 0): void {
   const ed = getEditor();
   if (!ed) {
@@ -191,10 +193,10 @@ function attachEditorListeners(attempt = 0): void {
     }
     return;
   }
-  if (listenersAttached) {
+  if (wiredEditors.has(ed)) {
     return;
   }
-  listenersAttached = true;
+  wiredEditors.add(ed);
   ed.on('update', () => {
     markDirty();
     emitWordCount(ed);
@@ -221,10 +223,14 @@ declare global {
   }
 }
 
-window.__mount = (b64?: string) => {
-  if ((window as any).__sd) {
-    return;
-  }
+/**
+ * True while the currently mounted SuperDoc was created from a supplied
+ * document (as opposed to a blank DOCX). Lets a no-arg loadBlank onto an
+ * already-blank mount stay an explicit idempotent no-op.
+ */
+let mountedWithDocument = false;
+
+function startSuperDoc(b64?: string): void {
   let docFile: Blob | undefined;
   if (typeof b64 === 'string') {
     const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
@@ -251,6 +257,39 @@ window.__mount = (b64?: string) => {
     onException: ({error}: any) =>
       post({type: 'error', message: String(error)}),
   });
+  mountedWithDocument = docFile != null;
+}
+
+window.__mount = (b64?: string) => {
+  const existing = (window as any).__sd;
+  if (!existing) {
+    startSuperDoc(b64);
+    return;
+  }
+  // Explicit idempotence edge only: blank loadBlank onto an already-blank
+  // mount. Anything else replaces the document (teardown + recreate).
+  if (b64 == null && !mountedWithDocument) {
+    return;
+  }
+  const finishReplace = () => {
+    // A pending autosave from the outgoing document must never fire
+    // against the replacement doc.
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    delete (window as any).__sd;
+    startSuperDoc(b64);
+  };
+  const destroyed =
+    typeof existing.destroy === 'function' ? existing.destroy() : undefined;
+  if (destroyed && typeof destroyed.then === 'function') {
+    // destroy may be async; recreate once it settles either way so a
+    // failed teardown can never wedge the webview without a document.
+    destroyed.catch(() => {}).then(finishReplace);
+  } else {
+    finishReplace();
+  }
 };
 
 window.__handleMessage = (data: string) => {
@@ -533,10 +572,12 @@ window.__handleMessage = (data: string) => {
           // untouched so it never drifts if both paths are ever mixed.
           ed.commands.insertContent(footnoteContent(0, cmd.text, shape));
         } else {
-          footnotesUsed += 1;
+          // Increment only after the dispatch succeeded so a failed
+          // insert never burns a footnote number.
           ed.commands.insertContent(
-            footnoteContent(footnotesUsed, cmd.text, shape),
+            footnoteContent(footnotesUsed + 1, cmd.text, shape),
           );
+          footnotesUsed += 1;
         }
       } catch (e: unknown) {
         post({type: 'cmd-error', cmd: 'insertFootnote'});

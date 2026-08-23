@@ -115,8 +115,10 @@ describe('tocFootnotes', () => {
     );
     expect(src).toContain("cmd.cmd === 'load'");
     expect(src).toContain("cmd.cmd === 'loadBlank'");
-    // one declaration + one reset per load path (load, loadBlank)
-    const resets = src.match(/footnotesUsed = 0;/g) ?? [];
-    expect(resets.length).toBeGreaterThanOrEqual(3);
+    // Each load path must reset the counter immediately before remounting,
+    // so a replaced document never inherits the old footnote numbering.
+    expect(
+      src.match(/footnotesUsed = 0;\s*\n\s*window\.__mount!/g),
+    ).toHaveLength(2);
   });
 });
