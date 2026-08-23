@@ -218,5 +218,78 @@ window.__handleMessage = (data: string) => {
       document.body.classList.toggle('dark', cmd.dark === true);
       break;
     }
+    case 'insertTable': {
+      const ed = getEditor();
+      if (!ed) {
+        post({type: 'cmd-error', cmd: 'insertTable'});
+        break;
+      }
+      try {
+        ed.commands.insertTable({
+          rows: Number(cmd.rows) + 1,
+          cols: Number(cmd.cols),
+          withHeaderRow: true,
+        });
+      } catch (e: unknown) {
+        post({type: 'cmd-error', cmd: 'insertTable'});
+        post({type: 'error', message: String(e)});
+      }
+      break;
+    }
+    case 'addTableRow':
+    case 'addTableColumn':
+    case 'deleteTableRow':
+    case 'deleteTableColumn':
+    case 'deleteTable': {
+      const ed = getEditor();
+      const tableCmd: Record<string, string> = {
+        addTableRow: 'addRowAfter',
+        addTableColumn: 'addColumnAfter',
+        deleteTableRow: 'deleteRow',
+        deleteTableColumn: 'deleteColumn',
+        deleteTable: 'deleteTable',
+      };
+      const fn = tableCmd[cmd.cmd];
+      if (!ed || typeof ed.commands?.[fn] !== 'function') {
+        post({type: 'cmd-error', cmd: cmd.cmd});
+        break;
+      }
+      try {
+        ed.commands[fn]();
+      } catch (e: unknown) {
+        // table mutations throw when the caret is outside a table
+        post({type: 'cmd-error', cmd: cmd.cmd});
+        post({type: 'error', message: String(e)});
+      }
+      break;
+    }
+    case 'insertPageBreak': {
+      const ed = getEditor();
+      if (!ed || !ed.state?.schema?.nodes || !ed.state.schema.nodes.pageBreak) {
+        post({type: 'cmd-error', cmd: 'insertPageBreak'});
+        break;
+      }
+      try {
+        ed.commands.insertContent({type: 'pageBreak'});
+      } catch (e: unknown) {
+        post({type: 'cmd-error', cmd: 'insertPageBreak'});
+        post({type: 'error', message: String(e)});
+      }
+      break;
+    }
+    case 'setPaperSize': {
+      const sizes: Record<string, [string, string]> = {
+        a4: ['210mm', '297mm'],
+        letter: ['216mm', '279mm'],
+        a5: ['148mm', '210mm'],
+        a3: ['297mm', '420mm'],
+      };
+      const [w, h] =
+        sizes[typeof cmd.paperSize === 'string' ? cmd.paperSize : ''] ??
+        sizes.a4;
+      document.documentElement.style.setProperty('--page-width', w);
+      document.documentElement.style.setProperty('--page-height', h);
+      break;
+    }
   }
 };

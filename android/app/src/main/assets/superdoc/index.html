@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="superdoc.css" />
     <style>
+      :root {
+        --page-width: 210mm;
+        --page-height: 297mm;
+      }
       html,
       body,
       #superdoc {
@@ -15,6 +19,10 @@
       body.dark,
       body.dark #superdoc {
         background: #1f2937;
+      }
+      .superdoc-page {
+        width: var(--page-width);
+        min-height: var(--page-height);
       }
     </style>
   </head>
