@@ -123,6 +123,15 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
     }
   }
 
+  // Dark mode: push theme to the bridge whenever it changes. Before 'ready'
+  // postCmd queues the command, so it also replays once on ready — covering
+  // a dark-mode app that mounts the editor directly.
+  const dark = props.dark === true;
+  useEffect(() => {
+    postCmd({cmd: 'setTheme', dark});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dark]);
+
   useImperativeHandle(ref, () => ({
     format: (key, value) => postCmd({cmd: 'format', key, value}),
     insertText: text => postCmd({cmd: 'insertText', text}),
@@ -242,9 +251,9 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
       setDisplayZoomControls={false}
       minimumZoomScale={0.5}
       maximumZoomScale={2.5}
-      backgroundColor="#ffffff"
+      backgroundColor={dark ? '#111827' : '#ffffff'}
       androidLayerType="hardware"
-      style={[styles.webview, {backgroundColor: '#ffffff'}]}
+      style={[styles.webview, {backgroundColor: dark ? '#111827' : '#ffffff'}]}
     />
   );
 });

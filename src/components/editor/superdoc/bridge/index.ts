@@ -483,6 +483,8 @@ window.__handleMessage = (data: string) => {
       } catch (e: unknown) {
         post({type: 'cmd-error', cmd: 'findReplace'});
         post({type: 'error', message: String(e)});
+        // Always settle the bar; FindReplaceBar waits on replace-done.
+        post({type: 'replace-done', count: 0});
       }
       break;
     }

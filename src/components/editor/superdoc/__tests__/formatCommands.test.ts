@@ -85,6 +85,13 @@ describe('applyFormat', () => {
     expect(ed.commands.setHeading).toHaveBeenCalledWith({level: 3});
   });
 
+  it('treats string "0" as paragraph, not heading level 0', () => {
+    const ed = makeEditor(['setHeading', 'setParagraph']);
+    expect(applyFormat(ed, 'header', '0')).toBe(true);
+    expect(ed.commands.setHeading).not.toHaveBeenCalled();
+    expect(ed.commands.setParagraph).toHaveBeenCalled();
+  });
+
   it('routes list variants to ordered/bullet/blockquote toggles', () => {
     const ed = makeEditor([
       'toggleOrderedList',

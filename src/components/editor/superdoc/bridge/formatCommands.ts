@@ -13,7 +13,11 @@ const FORMAT_MAP: Record<string, (ed: any, value: unknown) => void> = {
   background: (ed, v) => ed.commands.setBackgroundColor?.(String(v)),
   align: (ed, v) => ed.commands.setTextAlign(String(v)),
   header: (ed, v) =>
-    v ? ed.commands.setHeading({level: Number(v)}) : ed.commands.setParagraph(),
+    // Number() check, not truthiness: StyleBar's "Normal" sends false but a
+    // persisted/round-tripped '0' string is truthy and would set heading 0.
+    Number(v) > 0
+      ? ed.commands.setHeading({level: Number(v)})
+      : ed.commands.setParagraph(),
   font: (ed, v) => ed.commands.setFontFamily?.(String(v)),
   size: (ed, v) => ed.commands.setFontSize?.(String(v)),
   list: (ed, v) =>
