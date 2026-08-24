@@ -187,12 +187,16 @@ describe('documentRepository interface', () => {
       ).toBe(true);
     });
 
-    it('restoreSnapshot updates the document content, wordCount and updatedAt', async () => {
+    it('restoreSnapshot updates wordCount and updatedAt but never touches the content path', async () => {
       const doc = await documentRepository.create('Restore doc');
-      await documentRepository.update(doc.id, {content: 'current', wordCount: 3});
+      const pathContent = doc.content;
+      await documentRepository.update(doc.id, {
+        content: pathContent,
+        wordCount: 3,
+      });
       const revision = await documentRepository.createSnapshot(
         doc.id,
-        'old-content',
+        'docx-base64-payload',
         99,
       );
       const beforeUpdatedAt = (await documentRepository.getById(doc.id))!
@@ -202,11 +206,28 @@ describe('documentRepository interface', () => {
       await documentRepository.restoreSnapshot(doc.id, revision.id);
 
       const restored = await documentRepository.getById(doc.id);
-      expect(restored!.content).toBe('old-content');
+      // The docx base64 must never land in `content` — the legacy guard
+      // would treat it as a non-path and blank the paper on next open.
+      expect(restored!.content).toBe(pathContent);
       expect(restored!.wordCount).toBe(99);
       expect(new Date(restored!.updatedAt).getTime()).toBeGreaterThan(
         new Date(beforeUpdatedAt).getTime(),
       );
+    });
+
+    it('getRevision returns the revision for its owning document', async () => {
+      const docA = await documentRepository.create('GetRevision A');
+      const docB = await documentRepository.create('GetRevision B');
+      const revision = await documentRepository.createSnapshot(
+        docA.id,
+        'owned',
+        1,
+      );
+      await expect(
+        documentRepository.getRevision(docB.id, revision.id),
+      ).rejects.toThrow();
+      const owned = await documentRepository.getRevision(docA.id, revision.id);
+      expect(owned.content).toBe('owned');
     });
 
     it('restoreSnapshot throws when the revision belongs to another document', async () => {

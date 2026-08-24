@@ -98,4 +98,13 @@ describe('paperFileStore', () => {
     await copyBlankTemplate('p9');
     expect(RNFS.copyFileAssets).toHaveBeenCalledWith('documents/blank.docx', '/mock/docs/papers/p9.docx');
   });
+
+  it('restoreFromBase64 delegates to atomic save', async () => {
+    const {restoreFromBase64} = require('@/services/paperFileStore');
+    await restoreFromBase64('p9', 'QQ==');
+    expect(RNFS.moveFile).toHaveBeenCalledWith(
+      '/mock/docs/papers/p9.docx.tmp',
+      '/mock/docs/papers/p9.docx',
+    );
+  });
 });

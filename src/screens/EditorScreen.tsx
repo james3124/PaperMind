@@ -20,7 +20,11 @@ import {useSettingsStore} from '@/stores/settingsStore';
 import {useModelDownloadStore} from '@/stores/modelDownloadStore';
 import {exportPdf} from '@/services/pdfExport';
 import Share from 'react-native-share';
-import {savePaperDocx, copyBlankTemplate} from '@/services/paperFileStore';
+import {
+  savePaperDocx,
+  restoreFromBase64,
+  copyBlankTemplate,
+} from '@/services/paperFileStore';
 import {importDocx} from '@/services/docxImport';
 import {takePendingMarkdown} from '@/services/pipelineService';
 import EditorWebView, {EditorRef} from '@/components/editor/EditorWebView';
@@ -100,8 +104,6 @@ export default function EditorScreen({route, navigation}: Props) {
   const [showFootnote, setShowFootnote] = useState(false);
   const [footnoteText, setFootnoteText] = useState('');
 
-  const lastDeltaRef = useRef<string | null>(null);
-  const lastSnapshottedContentRef = useRef<string | null>(null);
   const wordCountRef = useRef(0);
 
   const paperSize = useSettingsStore(s => s.paperSize);
@@ -174,7 +176,6 @@ export default function EditorScreen({route, navigation}: Props) {
     async (b64: string) => {
       try {
         await savePaperDocx(documentId, b64);
-        lastSnapshottedContentRef.current = 'file'; // see Task 12
         setSaveStatus('saved');
       } catch (e: unknown) {
         setSaveStatus('unsaved');
@@ -256,7 +257,6 @@ export default function EditorScreen({route, navigation}: Props) {
             b64,
             wordCountRef.current,
           );
-          lastSnapshottedContentRef.current = b64;
           await refreshSnapshots();
         } catch (e: unknown) {
           Alert.alert(
@@ -283,12 +283,21 @@ export default function EditorScreen({route, navigation}: Props) {
             onPress: () => {
               void (async () => {
                 try {
+                  const revision = await documentRepository.getRevision(
+                    documentId,
+                    revisionId,
+                  );
+                  // Persist the snapshot docx as the paper's file, then swap
+                  // the live editor over to it. The content column keeps its
+                  // papers/<id>.docx path — never the base64 payload.
+                  await restoreFromBase64(documentId, revision.content);
                   await documentRepository.restoreSnapshot(
                     documentId,
                     revisionId,
                   );
+                  setWordCount(revision.wordCount);
+                  editorRef.current?.reloadWith(revision.content);
                   setShowSnapshots(false);
-                  loadDocument();
                 } catch (e: unknown) {
                   Alert.alert(
                     'Restore failed',
@@ -301,7 +310,7 @@ export default function EditorScreen({route, navigation}: Props) {
         ],
       );
     },
-    [documentId, loadDocument],
+    [documentId],
   );
 
   const handleDeleteSnapshot = useCallback(
@@ -320,22 +329,6 @@ export default function EditorScreen({route, navigation}: Props) {
     },
     [refreshSnapshots],
   );
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const delta = lastDeltaRef.current;
-      if (!delta || delta === lastSnapshottedContentRef.current) {
-        return;
-      }
-      void documentRepository
-        .createSnapshot(documentId, delta, wordCountRef.current)
-        .then(() => {
-          lastSnapshottedContentRef.current = delta;
-        })
-        .catch(() => {});
-    }, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [documentId]);
 
   const applyFootnote = useCallback(() => {
     const text = footnoteText.trim();

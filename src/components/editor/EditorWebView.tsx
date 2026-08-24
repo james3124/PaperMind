@@ -25,6 +25,7 @@ export interface EditorRef {
   redo: () => void;
   setPaperSize: (paperSize: PaperSize) => void;
   getContent: (onContent: (b64: string) => void) => void;
+  reloadWith: (b64: string) => void;
   replaceCitationMarkers: (
     index: number,
     oldMarker: string,
@@ -146,6 +147,7 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
       pendingGetContent.current.set(requestId, onContent);
       postCmd({cmd: 'exportNow', requestId});
     },
+    reloadWith: b64 => postCmd({cmd: 'load', b64}),
     replaceCitationMarkers: (index, oldMarker, newMarker) =>
       postCmd({cmd: 'replaceCitationMarkers', index, oldMarker, newMarker}),
     replaceReferences: entries => postCmd({cmd: 'replaceReferences', entries}),

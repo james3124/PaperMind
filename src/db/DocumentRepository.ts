@@ -160,6 +160,10 @@ export const documentRepository = {
     await database.write(async () => {
       await doc.destroyPermanently();
     });
+    // Best-effort: never let a missing file block the row deletion.
+    try {
+      await paperFileStore().deletePaperDocx(id);
+    } catch {}
   },
 
   async createSnapshot(
@@ -183,15 +187,25 @@ export const documentRepository = {
       .fetch();
   },
 
-  async restoreSnapshot(documentId: string, revisionId: string): Promise<void> {
+  async getRevision(
+    documentId: string,
+    revisionId: string,
+  ): Promise<DocumentRevision> {
     const revision = await revisionsCollection.find(revisionId);
     if (revision.documentId !== documentId) {
       throw new Error('Revision does not belong to this document');
     }
+    return revision;
+  },
+
+  // Snapshots store docx base64, never Delta JSON. The `content` column must
+  // keep pointing at the papers/<id>.docx path — writing the base64 payload
+  // there would trip the legacy guard on next open and blank the paper.
+  async restoreSnapshot(documentId: string, revisionId: string): Promise<void> {
+    const revision = await this.getRevision(documentId, revisionId);
     const doc = await collection.find(documentId);
     await database.write(async () => {
       await doc.update(d => {
-        d.content = revision.content;
         d.wordCount = revision.wordCount;
         d.updatedAt = new Date();
       });

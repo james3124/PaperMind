@@ -80,3 +80,7 @@ export async function copyBlankTemplate(destId: string): Promise<void> {
   await ensureDir();
   await RNFS.copyFileAssets(BLANK_ASSET, pathFor(destId));
 }
+
+// Snapshot restore reuses the atomic save path: the revision payload is a
+// full docx base64, identical in shape to what autosave persists.
+export const restoreFromBase64 = savePaperDocx;
