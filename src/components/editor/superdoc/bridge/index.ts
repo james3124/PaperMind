@@ -4,6 +4,7 @@ import 'superdoc/style.css';
 import {blobToBase64} from './exporter';
 import {applyFormat, currentFormats} from './formatCommands';
 import {createSaveStateTracker} from './saveState';
+import {markdownToBlocks} from '@/utils/markdownToDocxFragments';
 import {
   collectHeadings,
   findAllOccurrences,
@@ -326,6 +327,18 @@ window.__handleMessage = (data: string) => {
       const ed = getEditor();
       if (ed) {
         ed.commands.insertContent(cmd.text);
+      }
+      break;
+    }
+    case 'insertMarkdown': {
+      const ed = getEditor();
+      if (ed && typeof cmd.md === 'string') {
+        try {
+          ed.commands.insertContent(markdownToBlocks(cmd.md));
+        } catch (e: unknown) {
+          post({type: 'cmd-error', cmd: 'insertMarkdown'});
+          post({type: 'error', message: String(e)});
+        }
       }
       break;
     }

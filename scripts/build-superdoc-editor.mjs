@@ -10,6 +10,9 @@ await esbuild.build({
   minify: true,
   format: 'iife',
   target: ['chrome90'],
+  alias: {
+    '@': './src',
+  },
   outfile: `${OUT}/superdoc.js`,
   legalComments: 'inline',
 });
