@@ -7,7 +7,7 @@ import {createSaveStateTracker} from './saveState';
 import {markdownToBlocks} from '@/utils/markdownToDocxFragments';
 import {
   collectHeadings,
-  findAllOccurrences,
+  collectMatchRanges,
   type HeadingNode,
 } from './docQueries';
 import {
@@ -90,6 +90,25 @@ function markDirty(): void {
   saveTimer = setTimeout(() => void serializeAndPost('autosave'), 2000);
 }
 
+// Word count runs a full-document textBetween per keystroke; trailing
+// debounce keeps the content-change post off the hot path on long papers.
+let wordCountTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearWordCountTimer(): void {
+  if (wordCountTimer) {
+    clearTimeout(wordCountTimer);
+    wordCountTimer = null;
+  }
+}
+
+function scheduleWordCount(ed: any): void {
+  clearWordCountTimer();
+  wordCountTimer = setTimeout(() => {
+    wordCountTimer = null;
+    emitWordCount(ed);
+  }, 300);
+}
+
 function emitWordCount(ed: any): void {
   const text = ed.state.doc.textBetween(
     0,
@@ -103,31 +122,24 @@ function emitWordCount(ed: any): void {
   });
 }
 /**
- * Replaces every occurrence of `find` with `replace` across all text nodes.
- * Positions are collected first from the current immutable doc snapshot,
- * then applied bottom-up so each replacement cannot shift the offsets of
- * the ones still pending. Count = replacements actually dispatched.
+ * Replaces every occurrence of `find` with `replace`, including occurrences
+ * split across inline formatting inside one block. Matches are collected
+ * block-scoped from the current immutable doc snapshot, then applied
+ * bottom-up so each replacement cannot shift the offsets of the ones still
+ * pending. Count = replacements actually dispatched.
  */
 function replaceEverywhere(ed: any, find: string, replace: string): number {
   if (!find) {
     return 0;
   }
-  const positions: Array<{from: number; to: number}> = [];
-  ed.state.doc.descendants((node: any, pos: number) => {
-    if (node.isText && typeof node.text === 'string') {
-      findAllOccurrences(node.text, find).forEach((offset: number) => {
-        positions.push({from: pos + offset, to: pos + offset + find.length});
-      });
-    }
-  });
-  positions
-    .reverse()
-    .forEach(({from, to}) =>
-      ed.view.dispatch(
-        ed.state.tr.replaceWith(from, to, ed.schema.text(replace)),
-      ),
+  const ranges = collectMatchRanges(ed.state.doc, find);
+  for (let i = ranges.length - 1; i >= 0; i -= 1) {
+    const {from, to} = ranges[i];
+    ed.view.dispatch(
+      ed.state.tr.replaceWith(from, to, ed.schema.text(replace)),
     );
-  return positions.length;
+  }
+  return ranges.length;
 }
 
 /**
@@ -183,6 +195,10 @@ function scrollToBlock(ed: any, blockIndex: number): void {
 // wiring while double-attaching to the same editor stays impossible.
 const wiredEditors = new WeakSet<object>();
 
+// Last posted selection ("from:to") so identical selections are not
+// re-broadcast while the caret blinks or format state refreshes.
+let lastSelKey = '';
+
 function attachEditorListeners(attempt = 0): void {
   const ed = getEditor();
   if (!ed) {
@@ -200,13 +216,27 @@ function attachEditorListeners(attempt = 0): void {
   wiredEditors.add(ed);
   ed.on('update', () => {
     markDirty();
-    emitWordCount(ed);
+    scheduleWordCount(ed);
   });
-  // Toolbar state must track the caret/selection; also emit once right
-  // after attach so StyleBar highlights are correct before any navigation.
-  ed.on('selectionUpdate', () =>
-    post({type: 'format-change', format: currentFormats(ed)}),
-  );
+  // Toolbar state must track the caret/selection, and the AI panel needs the
+  // selected text (empty selection closes it). Also emitted once right after
+  // attach so StyleBar highlights are correct before any navigation.
+  lastSelKey = '';
+  ed.on('selectionUpdate', () => {
+    post({type: 'format-change', format: currentFormats(ed)});
+    const sel = ed.state?.selection;
+    if (!sel) {
+      return;
+    }
+    const key = `${sel.from}:${sel.to}`;
+    if (key !== lastSelKey) {
+      lastSelKey = key;
+      const text = sel.empty
+        ? ''
+        : ed.state.doc.textBetween(sel.from, sel.to, '\n');
+      post({type: 'selection-text', text});
+    }
+  });
   post({type: 'format-change', format: currentFormats(ed)});
 }
 
@@ -232,6 +262,9 @@ declare global {
 let mountedWithDocument = false;
 
 function startSuperDoc(b64?: string): void {
+  // A pending word-count post from the outgoing document must never fire
+  // against the replacement doc.
+  clearWordCountTimer();
   let docFile: Blob | undefined;
   if (typeof b64 === 'string') {
     const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
@@ -427,11 +460,15 @@ window.__handleMessage = (data: string) => {
         a5: ['148mm', '210mm'],
         a3: ['297mm', '420mm'],
       };
-      const [w, h] =
-        sizes[typeof cmd.paperSize === 'string' ? cmd.paperSize : ''] ??
-        sizes.a4;
-      document.documentElement.style.setProperty('--page-width', w);
-      document.documentElement.style.setProperty('--page-height', h);
+      const requested = typeof cmd.paperSize === 'string' ? cmd.paperSize : '';
+      const size = sizes[requested] ?? sizes.a4;
+      if (!sizes[requested]) {
+        // Unknown sizes silently fell back to A4 before; keep the behavior
+        // but make it diagnosable from logcat.
+        console.warn(`[superdoc] unknown paper size "${requested}", using a4`);
+      }
+      document.documentElement.style.setProperty('--page-width', size[0]);
+      document.documentElement.style.setProperty('--page-height', size[1]);
       break;
     }
     case 'getHeadings': {
@@ -489,9 +526,8 @@ window.__handleMessage = (data: string) => {
       break;
     }
     case 'replaceCitationMarkers': {
-      // Citation markers are inserted programmatically as single text runs
-      // (CitationManagerModal flow), so per-node scanning is safe; markers
-      // split across runs by partial formatting will not match here.
+      // Uses the same block-scoped routine as findReplace, so markers split
+      // across runs by partial formatting are replaced too.
       const ed = getEditor();
       if (!ed || typeof cmd.oldMarker !== 'string') {
         post({type: 'cmd-error', cmd: 'replaceCitationMarkers'});
