@@ -136,9 +136,10 @@ export default function EditorScreen({route, navigation}: Props) {
         } catch {
           setChatMessages([]);
         }
-        // Legacy guard: rows migrated from the Quill era store Delta JSON (or
-        // nothing) in `content`. Anything that is not a papers/ path is
-        // treated as fresh — provision a blank docx file and point at it.
+        // Legacy guard: rows migrated from the pre-SuperDoc era store Delta
+        // JSON (or nothing) in `content`. Anything that is not a papers/
+        // path is treated as fresh — provision a blank docx file and point
+        // at it.
         let path = doc.content;
         if (!path.startsWith('papers/')) {
           try {

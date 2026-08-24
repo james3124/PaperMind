@@ -106,7 +106,7 @@ describe('tocFootnotes', () => {
 
   it('keeps the bridge reset on both document-load paths', () => {
     // index.ts pulls in the superdoc bundle (not jest-safe), so assert the
-    // invariant at source level like quillHtml.test.ts does.
+    // invariant at source level.
     const fs = require('fs');
     const path = require('path');
     const src = fs.readFileSync(

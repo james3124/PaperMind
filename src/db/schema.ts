@@ -7,7 +7,7 @@ export const schema = appSchema({
       name: 'documents',
       columns: [
         {name: 'title', type: 'string'},
-        {name: 'content', type: 'string'}, // Quill delta JSON
+        {name: 'content', type: 'string'}, // docx storage path (papers/*.docx)
         {name: 'word_count', type: 'number'},
         {name: 'citation_style', type: 'string'},
         {name: 'citation_edition', type: 'string'},
