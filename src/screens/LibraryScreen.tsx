@@ -49,6 +49,7 @@ export default function LibraryScreen({navigation}: Props) {
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
 
   // Subscribe to WatermelonDB changes
   useEffect(() => {
@@ -131,6 +132,21 @@ export default function LibraryScreen({navigation}: Props) {
 
   async function handleNewPaper() {
     navigation.navigate('Generate');
+  }
+
+  // create() provisions the blank docx (copyBlankTemplate) and points the row
+  // at papers/<id>.docx, so no extra file work is needed here.
+  async function createBlankDocument() {
+    setFabOpen(false);
+    try {
+      const doc = await documentRepository.create('Untitled document');
+      navigation.navigate('Editor', {documentId: doc.id});
+    } catch (e: unknown) {
+      Alert.alert(
+        'Could not create document',
+        e instanceof Error ? e.message : 'Unknown error',
+      );
+    }
   }
 
   async function handleExport(doc: Document) {
@@ -251,7 +267,8 @@ export default function LibraryScreen({navigation}: Props) {
             <Text style={styles.emptyIcon}>📝</Text>
             <Text style={styles.emptyTitle}>No papers yet</Text>
             <Text style={styles.emptySubtitle}>
-              Tap + to generate your first research paper
+              Tap + to generate a research paper with AI or start a blank
+              document
             </Text>
           </View>
         }
@@ -272,8 +289,35 @@ export default function LibraryScreen({navigation}: Props) {
         )}
       />
 
+      {/* FAB choice sheet — Modal so tap-outside dismisses it */}
+      <Modal
+        visible={fabOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFabOpen(false)}>
+        <TouchableWithoutFeedback onPress={() => setFabOpen(false)}>
+          <View style={styles.sortBackdrop} />
+        </TouchableWithoutFeedback>
+        <View style={styles.fabMenu}>
+          <Text style={styles.sortMenuTitle}>New document</Text>
+          <TouchableOpacity
+            style={styles.sortItem}
+            onPress={() => {
+              setFabOpen(false);
+              handleNewPaper();
+            }}>
+            <Text style={styles.sortItemText}>Generate with AI</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.sortItem}
+            onPress={createBlankDocument}>
+            <Text style={styles.sortItemText}>New blank document</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
       {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={handleNewPaper}>
+      <TouchableOpacity style={styles.fab} onPress={() => setFabOpen(v => !v)}>
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
     </View>
@@ -339,6 +383,21 @@ const styles = StyleSheet.create({
   sortItemText: {fontSize: 15, color: '#374151'},
   sortItemTextActive: {color: '#6366f1', fontWeight: '600'},
   sortCheck: {fontSize: 14, color: '#6366f1', fontWeight: '700'},
+  fabMenu: {
+    position: 'absolute',
+    bottom: 96,
+    right: 24,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
+    minWidth: 220,
+    overflow: 'hidden',
+  },
   offlineBanner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
