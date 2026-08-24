@@ -158,6 +158,14 @@ export const documentRepository = {
   async delete(id: string): Promise<void> {
     const doc = await collection.find(id);
     await database.write(async () => {
+      // Purge version history in the same transaction as the row: snapshots
+      // store full base64 DOCX payloads, so any survivor is unbounded growth.
+      const revs = await revisionsCollection
+        .query(Q.where('document_id', id))
+        .fetch();
+      for (const r of revs) {
+        await r.destroyPermanently();
+      }
       await doc.destroyPermanently();
     });
     // Best-effort: never let a missing file block the row deletion.

@@ -59,9 +59,12 @@ export async function loadPaperDocx(id: string): Promise<string> {
 }
 
 export async function deletePaperDocx(id: string): Promise<void> {
-  try {
-    await RNFS.unlink(pathFor(id));
-  } catch {}
+  // Sweep the atomic-save siblings too: a crash during autosave can strand
+  // .tmp/.bak next to the deleted paper.
+  const dest = pathFor(id);
+  for (const p of [dest, `${dest}.tmp`, `${dest}.bak`]) {
+    await tryUnlink(p);
+  }
 }
 
 export async function duplicatePaperDocx(

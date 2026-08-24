@@ -10,53 +10,53 @@ jest.mock('../database', () => {
     const toCamel = (name: string) =>
       name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
     return {
-    query: (...clauses: any[]) => ({
-      observe: () => ({}),
-      fetch: async () => {
-        let rows = Array.from(store.values());
-        for (const clause of clauses) {
-          if (clause?.type === 'where') {
-            const col = toCamel(clause.left);
-            const rawExpected =
-              clause.comparison?.right !== undefined
-                ? clause.comparison.right
-                : clause.right;
-            const expected =
-              rawExpected !== null &&
-              typeof rawExpected === 'object' &&
-              'value' in rawExpected
-                ? rawExpected.value
-                : rawExpected;
-            rows = rows.filter(row => row[col] === expected);
-          } else if (clause?.type === 'sortBy') {
-            const key = toCamel(clause.sortColumn ?? clause.sortBy);
-            rows = [...rows].sort((a, b) =>
-              (a[key] as number) < (b[key] as number) ? -1 : 1,
-            );
-            if (clause.sortOrder === 'desc') {
-              rows.reverse();
+      query: (...clauses: any[]) => ({
+        observe: () => ({}),
+        fetch: async () => {
+          let rows = Array.from(store.values());
+          for (const clause of clauses) {
+            if (clause?.type === 'where') {
+              const col = toCamel(clause.left);
+              const rawExpected =
+                clause.comparison?.right !== undefined
+                  ? clause.comparison.right
+                  : clause.right;
+              const expected =
+                rawExpected !== null &&
+                typeof rawExpected === 'object' &&
+                'value' in rawExpected
+                  ? rawExpected.value
+                  : rawExpected;
+              rows = rows.filter(row => row[col] === expected);
+            } else if (clause?.type === 'sortBy') {
+              const key = toCamel(clause.sortColumn ?? clause.sortBy);
+              rows = [...rows].sort((a, b) =>
+                (a[key] as number) < (b[key] as number) ? -1 : 1,
+              );
+              if (clause.sortOrder === 'desc') {
+                rows.reverse();
+              }
             }
           }
-        }
-        return rows;
+          return rows;
+        },
+      }),
+      find: async (id: string) => store.get(id) ?? null,
+      create: async (fn: (doc: any) => void) => {
+        const doc: any = {
+          id: `${prefix}-${prefix === 'doc' ? nextDocId++ : nextRevId++}`,
+          update: async (updateFn: (d: any) => void) => {
+            updateFn(doc);
+            return doc;
+          },
+          destroyPermanently: async () => {
+            store.delete(doc.id);
+          },
+        };
+        fn(doc);
+        store.set(doc.id, doc);
+        return doc;
       },
-    }),
-    find: async (id: string) => store.get(id) ?? null,
-    create: async (fn: (doc: any) => void) => {
-      const doc: any = {
-        id: `${prefix}-${prefix === 'doc' ? nextDocId++ : nextRevId++}`,
-        update: async (updateFn: (d: any) => void) => {
-          updateFn(doc);
-          return doc;
-        },
-        destroyPermanently: async () => {
-          store.delete(doc.id);
-        },
-      };
-      fn(doc);
-      store.set(doc.id, doc);
-      return doc;
-    },
     };
   };
 
@@ -66,7 +66,9 @@ jest.mock('../database', () => {
   return {
     database: {
       get: (_table: string) =>
-        _table === 'document_revisions' ? revisionsCollection : documentsCollection,
+        _table === 'document_revisions'
+          ? revisionsCollection
+          : documentsCollection,
       write: async (fn: () => unknown) => fn(),
     },
   };
@@ -134,6 +136,25 @@ describe('documentRepository interface', () => {
     expect(copy.chatJson).toBe(doc.chatJson);
   });
 
+  describe('delete', () => {
+    it('purges snapshots together with the paper row', async () => {
+      const doc = await documentRepository.create('Doomed doc');
+      const other = await documentRepository.create('Survivor doc');
+      await documentRepository.createSnapshot(doc.id, 'base64-v1', 10);
+      await documentRepository.createSnapshot(doc.id, 'base64-v2', 20);
+      await documentRepository.createSnapshot(other.id, 'keep-me', 5);
+
+      await documentRepository.delete(doc.id);
+
+      expect(await documentRepository.getById(doc.id)).toBeNull();
+      expect(await documentRepository.listSnapshots(doc.id)).toHaveLength(0);
+      // Other papers keep their history untouched.
+      const survivorSnaps = await documentRepository.listSnapshots(other.id);
+      expect(survivorSnaps).toHaveLength(1);
+      expect(survivorSnaps[0].content).toBe('keep-me');
+    });
+  });
+
   describe('snapshots (document revisions)', () => {
     let dateNowSpy: jest.SpyInstance;
     let currentTime: number;
@@ -182,9 +203,7 @@ describe('documentRepository interface', () => {
       expect(snapshots).toHaveLength(2);
       expect(snapshots[0].content).toBe('v2');
       expect(snapshots[1].content).toBe('v1');
-      expect(
-        snapshots.every(rev => rev.documentId === docA.id),
-      ).toBe(true);
+      expect(snapshots.every(rev => rev.documentId === docA.id)).toBe(true);
     });
 
     it('restoreSnapshot updates wordCount and updatedAt but never touches the content path', async () => {

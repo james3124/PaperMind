@@ -87,8 +87,15 @@ describe('paperFileStore', () => {
   });
 
   it('delete ignores missing files', async () => {
-    (RNFS.unlink as jest.Mock).mockRejectedValueOnce(new Error('nope'));
+    (RNFS.unlink as jest.Mock).mockRejectedValue(new Error('nope'));
     await expect(deletePaperDocx('p1')).resolves.toBeUndefined();
+  });
+
+  it('delete sweeps the docx plus its tmp/bak atomic-save siblings', async () => {
+    await deletePaperDocx('p1');
+    expect(RNFS.unlink).toHaveBeenCalledWith('/mock/docs/papers/p1.docx');
+    expect(RNFS.unlink).toHaveBeenCalledWith('/mock/docs/papers/p1.docx.tmp');
+    expect(RNFS.unlink).toHaveBeenCalledWith('/mock/docs/papers/p1.docx.bak');
   });
 
   it('duplicates copies source to destination', async () => {
