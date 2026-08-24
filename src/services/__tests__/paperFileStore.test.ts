@@ -19,6 +19,7 @@ import {
   deletePaperDocx,
   duplicatePaperDocx,
   copyBlankTemplate,
+  importDocxFromUri,
 } from '@/services/paperFileStore';
 
 describe('paperFileStore', () => {
@@ -32,8 +33,15 @@ describe('paperFileStore', () => {
 
   it('saves atomically via temp file', async () => {
     await savePaperDocx('p1', 'AAA=');
-    expect(RNFS.writeFile).toHaveBeenCalledWith('/mock/docs/papers/p1.docx.tmp', 'AAA=', 'base64');
-    expect(RNFS.moveFile).toHaveBeenCalledWith('/mock/docs/papers/p1.docx.tmp', '/mock/docs/papers/p1.docx');
+    expect(RNFS.writeFile).toHaveBeenCalledWith(
+      '/mock/docs/papers/p1.docx.tmp',
+      'AAA=',
+      'base64',
+    );
+    expect(RNFS.moveFile).toHaveBeenCalledWith(
+      '/mock/docs/papers/p1.docx.tmp',
+      '/mock/docs/papers/p1.docx',
+    );
   });
 
   it('creates the papers directory when missing', async () => {
@@ -55,8 +63,13 @@ describe('paperFileStore', () => {
       .mockResolvedValueOnce(undefined) // dest -> backup
       .mockRejectedValueOnce(new Error('move failed')); // tmp -> dest
     await expect(savePaperDocx('p1', 'AAA=')).rejects.toThrow('move failed');
-    expect(RNFS.moveFile).toHaveBeenCalledWith('/mock/docs/papers/p1.docx.bak', '/mock/docs/papers/p1.docx');
-    expect(RNFS.unlink).not.toHaveBeenCalledWith('/mock/docs/papers/p1.docx.bak');
+    expect(RNFS.moveFile).toHaveBeenCalledWith(
+      '/mock/docs/papers/p1.docx.bak',
+      '/mock/docs/papers/p1.docx',
+    );
+    expect(RNFS.unlink).not.toHaveBeenCalledWith(
+      '/mock/docs/papers/p1.docx.bak',
+    );
   });
 
   it('cleans up orphaned temp file on failure', async () => {
@@ -67,7 +80,10 @@ describe('paperFileStore', () => {
 
   it('loads by id', async () => {
     await expect(loadPaperDocx('p1')).resolves.toBe('AAA=');
-    expect(RNFS.readFile).toHaveBeenCalledWith('/mock/docs/papers/p1.docx', 'base64');
+    expect(RNFS.readFile).toHaveBeenCalledWith(
+      '/mock/docs/papers/p1.docx',
+      'base64',
+    );
   });
 
   it('delete ignores missing files', async () => {
@@ -80,7 +96,10 @@ describe('paperFileStore', () => {
       .mockResolvedValueOnce(true) // ensureDir
       .mockResolvedValueOnce(true); // source file
     await duplicatePaperDocx('a', 'b');
-    expect(RNFS.copyFile).toHaveBeenCalledWith('/mock/docs/papers/a.docx', '/mock/docs/papers/b.docx');
+    expect(RNFS.copyFile).toHaveBeenCalledWith(
+      '/mock/docs/papers/a.docx',
+      '/mock/docs/papers/b.docx',
+    );
   });
 
   it('duplicate rejects identical source and destination ids', async () => {
@@ -89,14 +108,28 @@ describe('paperFileStore', () => {
   });
 
   it('duplicate rejects a missing source file', async () => {
-    await expect(duplicatePaperDocx('missing', 'b')).rejects.toThrow('source paper not found');
+    await expect(duplicatePaperDocx('missing', 'b')).rejects.toThrow(
+      'source paper not found',
+    );
     expect(RNFS.copyFile).not.toHaveBeenCalled();
+  });
+
+  it('importDocxFromUri copies the picked file into the papers store', async () => {
+    (RNFS.exists as jest.Mock).mockResolvedValueOnce(true); // ensureDir
+    await importDocxFromUri('file:///cache/picked.docx', 'p7');
+    expect(RNFS.copyFile).toHaveBeenCalledWith(
+      '/cache/picked.docx',
+      '/mock/docs/papers/p7.docx',
+    );
   });
 
   it('copyBlankTemplate copies the bundled asset into place', async () => {
     (RNFS.exists as jest.Mock).mockResolvedValueOnce(true); // ensureDir
     await copyBlankTemplate('p9');
-    expect(RNFS.copyFileAssets).toHaveBeenCalledWith('documents/blank.docx', '/mock/docs/papers/p9.docx');
+    expect(RNFS.copyFileAssets).toHaveBeenCalledWith(
+      'documents/blank.docx',
+      '/mock/docs/papers/p9.docx',
+    );
   });
 
   it('restoreFromBase64 delegates to atomic save', async () => {

@@ -1,22 +1,31 @@
 import RNFS from 'react-native-fs';
-import {exportDocx, shareDocx} from './docxExport';
+import Share from 'react-native-share';
+import {paperPath} from './paperFileStore';
 
-export async function exportAndShareDocx(
-  title: string,
-  content: string,
-): Promise<void> {
-  const outPath = await exportDocx(title, content);
-  const fileName = outPath.split('/').pop() ?? `${title || 'paper'}.docx`;
-  await shareDocx(outPath, fileName);
-}
-
-export function getFileNameFromPath(path: string): string {
-  const name = path.split('/').pop() ?? '';
-  return name.length > 0 ? name : 'paper.docx';
-}
-
-export {RNFS};
-
-export async function ensureExportDir(): Promise<void> {
+// Shares the stored papers/<id>.docx directly — no rebuilding from text. The
+// file is copied to a readable, title-named path first; the original paper
+// file is never touched (a failed share cannot corrupt it).
+export async function shareExistingDocx(doc: {
+  id: string;
+  title: string;
+}): Promise<void> {
+  const fileName = `${sanitizeTitle(doc.title)}.docx`;
+  // App-private cache works on Android 10+ scoped storage without extra
+  // permissions; the system share sheet gets the file:// URL.
+  const sharePath = `${RNFS.CachesDirectoryPath}/export/${fileName}`;
   await RNFS.mkdir(`${RNFS.CachesDirectoryPath}/export`);
+  await RNFS.copyFile(paperPath(doc.id), sharePath);
+  await Share.open({
+    url: `file://${sharePath}`,
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    title: `Share ${fileName}`,
+  });
+}
+
+export function sanitizeTitle(title: string): string {
+  const safe = title
+    .replace(/[^a-zA-Z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '_');
+  return safe || 'paper';
 }

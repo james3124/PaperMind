@@ -16,8 +16,8 @@ import type {RootStackParamList} from '@/navigation/AppNavigator';
 import {database} from '@/db/database';
 import Document from '@/db/models/Document';
 import {documentRepository} from '@/db/DocumentRepository';
-import {importDocx} from '@/services/docxImport';
-import {exportAndShareDocx} from '@/services/exportContent';
+import {importDocxFromUri} from '@/services/paperFileStore';
+import {shareExistingDocx} from '@/services/exportContent';
 import DocumentCard from '@/components/library/DocumentCard';
 import DocumentPicker from 'react-native-document-picker';
 
@@ -99,17 +99,24 @@ export default function LibraryScreen({navigation}: Props) {
       });
 
       setImporting(true);
-      const filePath = result.fileCopyUri ?? result.uri;
-      const content = await importDocx(filePath.replace('file://', ''));
+      const sourceUri = result.fileCopyUri ?? result.uri;
       const title = (result.name ?? 'Imported Document').replace(
         /\.docx?$/i,
         '',
       );
+      // The row's content points at papers/<id>.docx from the start; the
+      // picked file replaces the blank template provisioned by create().
       const doc = await documentRepository.create(title);
-      await documentRepository.update(doc.id, {
-        content,
-        wordCount: content.split(/\s+/).filter(Boolean).length,
-      });
+      try {
+        await importDocxFromUri(sourceUri, doc.id);
+      } catch (copyErr: unknown) {
+        // No orphan blank row when the file copy fails.
+        try {
+          await documentRepository.delete(doc.id);
+        } catch {}
+        throw copyErr;
+      }
+      navigation.navigate('Editor', {documentId: doc.id});
     } catch (e: unknown) {
       if (!DocumentPicker.isCancel(e)) {
         Alert.alert(
@@ -132,7 +139,7 @@ export default function LibraryScreen({navigation}: Props) {
     }
     setExportingId(doc.id);
     try {
-      await exportAndShareDocx(doc.title, doc.content);
+      await shareExistingDocx({id: doc.id, title: doc.title});
     } catch (e: unknown) {
       Alert.alert(
         'Export failed',

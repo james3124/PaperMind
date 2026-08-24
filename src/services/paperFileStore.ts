@@ -64,9 +64,14 @@ export async function deletePaperDocx(id: string): Promise<void> {
   } catch {}
 }
 
-export async function duplicatePaperDocx(srcId: string, destId: string): Promise<void> {
+export async function duplicatePaperDocx(
+  srcId: string,
+  destId: string,
+): Promise<void> {
   if (srcId === destId) {
-    throw new Error(`duplicatePaperDocx: source and destination ids must differ (${srcId})`);
+    throw new Error(
+      `duplicatePaperDocx: source and destination ids must differ (${srcId})`,
+    );
   }
   await ensureDir();
   const src = pathFor(srcId);
@@ -74,6 +79,18 @@ export async function duplicatePaperDocx(srcId: string, destId: string): Promise
     throw new Error(`duplicatePaperDocx: source paper not found at ${src}`);
   }
   await RNFS.copyFile(src, pathFor(destId));
+}
+
+// Imports an externally picked .docx (DocumentPicker file:// or content://
+// URI) into the papers store under the given id, replacing whatever is there
+// (typically the blank template provisioned by repository.create).
+export async function importDocxFromUri(
+  sourceUri: string,
+  id: string,
+): Promise<void> {
+  await ensureDir();
+  const src = sourceUri.replace(/^file:\/\//, '');
+  await RNFS.copyFile(src, pathFor(id));
 }
 
 export async function copyBlankTemplate(destId: string): Promise<void> {

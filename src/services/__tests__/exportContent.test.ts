@@ -1,7 +1,8 @@
 jest.mock('react-native-fs', () => ({
   CachesDirectoryPath: '/cache',
+  DocumentDirectoryPath: '/mock/docs',
   mkdir: jest.fn().mockResolvedValue(undefined),
-  writeFile: jest.fn().mockResolvedValue(undefined),
+  copyFile: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('react-native-share', () => ({
@@ -9,36 +10,32 @@ jest.mock('react-native-share', () => ({
   default: {open: jest.fn().mockResolvedValue(undefined)},
 }));
 
-jest.mock('jszip');
+import {sanitizeTitle, shareExistingDocx} from '@/services/exportContent';
 
-import {
-  getFileNameFromPath,
-  exportAndShareDocx,
-} from '@/services/exportContent';
-
-describe('getFileNameFromPath', () => {
-  it('returns the trailing filename', () => {
-    expect(
-      getFileNameFromPath(
-        '/data/user/0/com.papermind/cache/export/My_Paper.docx',
-      ),
-    ).toBe('My_Paper.docx');
+describe('sanitizeTitle', () => {
+  it('strips unsafe characters and uses underscores', () => {
+    expect(sanitizeTitle('My: Cool/Paper?')).toBe('My_CoolPaper');
   });
 
-  it('falls back when path is empty', () => {
-    expect(getFileNameFromPath('')).toBe('paper.docx');
+  it('falls back to "paper" when nothing survives', () => {
+    expect(sanitizeTitle('???')).toBe('paper');
   });
 });
 
-describe('exportAndShareDocx wiring', () => {
-  it('exports a DOCX and opens the share sheet', async () => {
-    const {writeFile, mkdir} = require('react-native-fs');
+describe('shareExistingDocx', () => {
+  it('copies the stored paper to a titled path and opens the share sheet', async () => {
+    const {copyFile, mkdir} = require('react-native-fs');
     const Share = require('react-native-share').default;
 
-    await exportAndShareDocx('My Title', 'Hello\nWorld');
+    await shareExistingDocx({id: 'doc1', title: 'My Title'});
 
-    expect(mkdir).toHaveBeenCalled();
-    expect(writeFile).toHaveBeenCalled();
-    expect(Share.open).toHaveBeenCalled();
+    expect(mkdir).toHaveBeenCalledWith('/cache/export');
+    expect(copyFile).toHaveBeenCalledWith(
+      '/mock/docs/papers/doc1.docx',
+      '/cache/export/My_Title.docx',
+    );
+    expect(Share.open).toHaveBeenCalledWith(
+      expect.objectContaining({url: 'file:///cache/export/My_Title.docx'}),
+    );
   });
 });

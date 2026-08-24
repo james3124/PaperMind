@@ -25,7 +25,7 @@ import {
   restoreFromBase64,
   copyBlankTemplate,
 } from '@/services/paperFileStore';
-import {importDocx} from '@/services/docxImport';
+import {extractDocxText} from '@/services/docxText';
 import {takePendingMarkdown} from '@/services/pipelineService';
 import EditorWebView, {EditorRef} from '@/components/editor/EditorWebView';
 import TabToolbar from '@/components/editor/TabToolbar';
@@ -220,7 +220,7 @@ export default function EditorScreen({route, navigation}: Props) {
     }
     const tmp = `${RNFS.CachesDirectoryPath}/papermind-current.docx`;
     await RNFS.writeFile(tmp, b64, 'base64');
-    return importDocx(tmp);
+    return extractDocxText(tmp);
   }, []);
 
   const refreshSnapshots = useCallback(async () => {
