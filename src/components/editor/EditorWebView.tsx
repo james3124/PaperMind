@@ -50,6 +50,7 @@ interface Props {
   onSaveStateChange?: (state: 'dirty' | 'saved') => void;
   onAutosave?: (b64: string) => void;
   dark?: boolean;
+  paperSize?: PaperSize;
 }
 
 const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
@@ -131,6 +132,16 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
     postCmd({cmd: 'setTheme', dark});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dark]);
+
+  // Paper size: same pattern as dark mode, so a persisted Letter/A5/A3 is
+  // applied on every fresh editor session (the shell defaults to A4) and
+  // toolbar changes stay idempotent through this one effect.
+  useEffect(() => {
+    if (props.paperSize) {
+      postCmd({cmd: 'setPaperSize', paperSize: props.paperSize});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.paperSize]);
 
   useImperativeHandle(ref, () => ({
     format: (key, value) => postCmd({cmd: 'format', key, value}),

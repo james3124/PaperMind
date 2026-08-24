@@ -675,8 +675,9 @@ export default function EditorScreen({route, navigation}: Props) {
         }}
         onOutline={handleOutline}
         onPaperSize={size => {
+          // Persisting flows through the store into EditorWebView's effect,
+          // which pushes setPaperSize to the bridge (idempotent re-send ok).
           setPaperSize(size);
-          editorRef.current?.setPaperSize(size);
         }}
         onOpenColor={kind => setColorKind(kind)}
         onSpacing={value =>
@@ -723,6 +724,7 @@ export default function EditorScreen({route, navigation}: Props) {
               initialContentPath={contentPath ?? null}
               blankMode={!contentPath}
               dark={isDark}
+              paperSize={paperSize}
               onContentChange={onContentChange}
               onFormatChange={onFormatChange}
               onHeadings={onHeadings}
