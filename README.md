@@ -1,3 +1,11 @@
+<h1 align="center">
+  <a href="https://github.com/james3124/PaperMind">
+    <img src="https://raw.githubusercontent.com/james3124/PaperMind/master/android/app/src/main/res/mipmap-hdpi/ic_launcher.png" alt="PaperMind" width="256" height="256" />
+  </a>
+  <br/>
+  PaperMind
+</h1>
+
 <div align="center">
 
 # 📚 PaperMind
