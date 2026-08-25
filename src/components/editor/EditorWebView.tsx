@@ -195,6 +195,9 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
         case 'error':
           console.warn(`[EditorWebView] bridge error: ${msg.message}`);
           break;
+        case 'engine-debug':
+          console.warn(`[EditorWebView] ${msg.message}`);
+          break;
         case 'docx-autosave':
           props.onAutosave?.(msg.b64);
           break;

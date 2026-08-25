@@ -36,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build editor bundle
+        run: npm run build:editor
+
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 

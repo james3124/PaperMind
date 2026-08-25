@@ -273,6 +273,11 @@ function prepareEngineWorker(): Promise<void> {
   if (!enginePrepared) {
     enginePrepared = installEngineWorkerUrl({
       entryPath: readWorkerEntryMeta(document),
+      // Surfaced through the RN log so device logcat shows exactly which
+      // install strategy won; 'direct' means the blob paths failed and the
+      // module worker will almost certainly not boot.
+      onInstalled: ({strategy}) =>
+        post({type: 'engine-debug', message: `worker install: ${strategy}`}),
     }).then(
       () => undefined,
       () => undefined,

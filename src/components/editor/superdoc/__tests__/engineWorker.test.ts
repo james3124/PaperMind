@@ -82,21 +82,70 @@ describe('installEngineWorkerUrl', () => {
     expect(await created[0].text()).toBe('// worker code');
   });
 
-  it('falls back to the direct asset URL when the fetch fails', async () => {
+  // Android WebView rejects fetch() for file:// URLs even when
+  // allowFileAccessFromFileURLs is on; XHR honors those settings, so the
+  // XHR-sourced blob must be tried before the (module-worker-incompatible)
+  // direct file:// fallback.
+  it('installs an xhr-fetched blob when fetch rejects', async () => {
     const h = makeHarness();
+    const created: Blob[] = [];
+    const strategies: string[] = [];
     const ok = await installEngineWorkerUrl({
       baseHref: 'file:///android_asset/superdoc/index.html',
       entryPath: 'assets/browser-worker-entry-abc.js',
       fetchText: async () => {
-        throw new Error('file fetch blocked');
+        throw new TypeError('Failed to fetch');
+      },
+      xhrText: async () => '// xhr worker code',
+      createObjectUrl: (blob: Blob) => {
+        created.push(blob);
+        return 'blob:xhr/1';
+      },
+      setGlobal: h.setGlobal,
+      onInstalled: info => strategies.push(info.strategy),
+    });
+    expect(ok).toBe(true);
+    expect(h.installed).toEqual(['blob:xhr/1']);
+    expect(await created[0].text()).toBe('// xhr worker code');
+    expect(strategies).toEqual(['blob-xhr']);
+  });
+
+  it('reports the fetch blob strategy when the first attempt succeeds', async () => {
+    const h = makeHarness();
+    const strategies: string[] = [];
+    await installEngineWorkerUrl({
+      baseHref: 'file:///android_asset/superdoc/index.html',
+      entryPath: 'assets/browser-worker-entry-abc.js',
+      fetchText: async () => '// worker code',
+      xhrText: async () => '// should never run',
+      createObjectUrl: () => 'blob:fetch/1',
+      setGlobal: h.setGlobal,
+      onInstalled: info => strategies.push(info.strategy),
+    });
+    expect(strategies).toEqual(['blob-fetch']);
+  });
+
+  it('falls back to the direct asset URL only when fetch and xhr both fail', async () => {
+    const h = makeHarness();
+    const strategies: string[] = [];
+    const ok = await installEngineWorkerUrl({
+      baseHref: 'file:///android_asset/superdoc/index.html',
+      entryPath: 'assets/browser-worker-entry-abc.js',
+      fetchText: async () => {
+        throw new TypeError('Failed to fetch');
+      },
+      xhrText: async () => {
+        throw new Error('worker xhr blocked');
       },
       createObjectUrl: () => 'blob:never',
       setGlobal: h.setGlobal,
+      onInstalled: info => strategies.push(info.strategy),
     });
     expect(ok).toBe(true);
     expect(h.installed).toEqual([
       'file:///android_asset/superdoc/assets/browser-worker-entry-abc.js',
     ]);
+    expect(strategies).toEqual(['direct']);
   });
 
   it('reports failure when no entry path resolves', async () => {
