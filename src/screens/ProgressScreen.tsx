@@ -3,9 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '@/navigation/AppNavigator';
 import {
@@ -16,12 +17,16 @@ import {
 import {modelExists} from '@/utils/modelPaths';
 import {isCloudConfigured} from '@/services/cloudService';
 import {useSettingsStore} from '@/stores/settingsStore';
+import {useTheme} from '@/theme/theme';
+import Button from '@/components/ui/Button';
+import ProgressBar from '@/components/ui/ProgressBar';
 import StageList from '@/components/generate/StageList';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Progress'>;
 
 export default function ProgressScreen({route, navigation}: Props) {
   const params = route.params;
+  const {palette, elevation} = useTheme();
 
   const [currentStage, setCurrentStage] = useState(0);
   const [completedStages, setCompletedStages] = useState<Set<number>>(
@@ -134,51 +139,66 @@ export default function ProgressScreen({route, navigation}: Props) {
 
   if (fatalError) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorTitle}>Generation Failed</Text>
-        <Text style={styles.errorMessage}>{fatalError}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => setRunKey(k => k + 1)}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+      <View style={[styles.errorContainer, {backgroundColor: palette.bg}]}>
+        <View
+          style={[
+            styles.errorIconWrap,
+            {backgroundColor: palette.dangerSubtle},
+          ]}>
+          <Ionicons name="alert-circle" size={30} color={palette.danger} />
+        </View>
+        <Text style={[styles.errorTitle, {color: palette.text}]}>
+          Generation failed
+        </Text>
+        <Text style={[styles.errorMessage, {color: palette.textSoft}]}>
+          {fatalError}
+        </Text>
+        <Button label="Retry" onPress={() => setRunKey(k => k + 1)} />
         {failedWithCloud && (
-          <TouchableOpacity
-            style={[styles.retryButton, styles.localButton]}
+          <Button
+            label="Use on-device model instead"
+            variant="secondary"
             onPress={() => {
               useSettingsStore.getState().setProvider('local');
               setRunKey(k => k + 1);
-            }}>
-            <Text style={styles.retryText}>Use on-device model instead</Text>
-          </TouchableOpacity>
+            }}
+          />
         )}
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => navigation.goBack()}>
-          <Text style={styles.retryText}>Go Back</Text>
-        </TouchableOpacity>
+        <Button
+          label="Go back"
+          variant="ghost"
+          onPress={() => navigation.goBack()}
+        />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Progress bar */}
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, {width: `${progress * 100}%`}]} />
-      </View>
-
-      {/* Stage counter */}
-      <View style={styles.counterRow}>
-        <Text style={styles.counterText}>
-          {completedCount} / {STAGE_LABELS.length} stages complete
+    <View style={[styles.container, {backgroundColor: palette.bg}]}>
+      {/* Progress summary */}
+      <View style={styles.summaryRow}>
+        <Text style={[styles.counterText, {color: palette.textSoft}]}>
+          <Text style={[styles.counterStrong, {color: palette.text}]}>
+            {completedCount}
+          </Text>
+          {' / '}
+          {STAGE_LABELS.length} stages complete
         </Text>
         {sourcesFound !== null && (
-          <Text style={styles.sourcesText}>
-            📚 {sourcesFound} sources found
-          </Text>
+          <View
+            style={[
+              styles.sourcesChip,
+              {backgroundColor: palette.accentSubtle},
+            ]}>
+            <Ionicons name="library-outline" size={13} color={palette.accent} />
+            <Text style={[styles.sourcesText, {color: palette.accent}]}>
+              {sourcesFound} sources
+            </Text>
+          </View>
         )}
       </View>
+
+      <ProgressBar progress={progress} style={styles.progress} />
 
       {/* Stage list */}
       <View style={styles.stageListContainer}>
@@ -192,10 +212,16 @@ export default function ProgressScreen({route, navigation}: Props) {
 
       {/* Non-fatal errors */}
       {errors.length > 0 && (
-        <View style={styles.warningsContainer}>
+        <View
+          style={[
+            styles.warningsContainer,
+            {backgroundColor: palette.warningSubtle},
+          ]}>
           {errors.map((e, i) => (
-            <Text key={i} style={styles.warningText}>
-              ⚠️ {e}
+            <Text
+              key={i}
+              style={[styles.warningText, {color: palette.warning}]}>
+              ⚠ {e}
             </Text>
           ))}
         </View>
@@ -203,28 +229,55 @@ export default function ProgressScreen({route, navigation}: Props) {
 
       {/* Live stream preview */}
       {streamText.length > 0 && !completed && (
-        <View style={styles.streamContainer}>
-          <Text style={styles.streamLabel}>Writing…</Text>
+        <View
+          style={[
+            styles.streamContainer,
+            {backgroundColor: palette.surfaceAlt},
+          ]}>
+          <View style={styles.streamLabelRow}>
+            <ActivityIndicator size="small" color={palette.accent} />
+            <Text style={[styles.streamLabel, {color: palette.textSoft}]}>
+              Writing…
+            </Text>
+          </View>
           <ScrollView style={styles.streamScroll}>
-            <Text style={styles.streamText}>{streamText.slice(-400)}</Text>
+            <Text style={[styles.streamText, {color: palette.textSoft}]}>
+              {streamText.slice(-400)}
+            </Text>
           </ScrollView>
         </View>
       )}
 
       {/* Completion actions */}
       {completed && documentId && (
-        <View style={styles.completionContainer}>
-          <Text style={styles.completionTitle}>✓ Paper Ready!</Text>
-          <TouchableOpacity
-            style={styles.openButton}
-            onPress={() => navigation.replace('Editor', {documentId})}>
-            <Text style={styles.openButtonText}>Open in Editor</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.libraryButton}
-            onPress={() => navigation.navigate('Library')}>
-            <Text style={styles.libraryButtonText}>Back to Library</Text>
-          </TouchableOpacity>
+        <View
+          style={[
+            styles.completionContainer,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.border,
+            },
+            elevation.raised(palette.shadow),
+          ]}>
+          <View style={styles.completionHeader}>
+            <Ionicons
+              name="checkmark-circle"
+              size={26}
+              color={palette.success}
+            />
+            <Text style={[styles.completionTitle, {color: palette.text}]}>
+              Paper ready
+            </Text>
+          </View>
+          <Button
+            label="Open in editor"
+            onPress={() => navigation.replace('Editor', {documentId})}
+          />
+          <Button
+            label="Back to library"
+            variant="ghost"
+            onPress={() => navigation.navigate('Library')}
+          />
         </View>
       )}
     </View>
@@ -232,71 +285,90 @@ export default function ProgressScreen({route, navigation}: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#fff', padding: 20},
-  progressBar: {
-    height: 6,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 3,
-    marginBottom: 12,
-    overflow: 'hidden',
-  },
-  progressFill: {height: '100%', backgroundColor: '#6366f1', borderRadius: 3},
-  counterRow: {
+  container: {flex: 1, padding: 20},
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  counterText: {fontSize: 13, color: '#6b7280'},
-  sourcesText: {fontSize: 13, color: '#6b7280'},
+  counterText: {fontSize: 14},
+  counterStrong: {
+    fontSize: 18,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  sourcesChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  sourcesText: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  progress: {marginBottom: 16},
   stageListContainer: {flex: 1},
   warningsContainer: {
-    backgroundColor: '#fff7ed',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 8,
-  },
-  warningText: {fontSize: 12, color: '#92400e', marginBottom: 2},
-  streamContainer: {
-    height: 100,
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 8,
-  },
-  streamLabel: {fontSize: 11, color: '#6b7280', marginBottom: 4},
-  streamScroll: {flex: 1},
-  streamText: {fontSize: 12, color: '#374151', lineHeight: 18},
-  completionContainer: {padding: 16, alignItems: 'center', gap: 12},
-  completionTitle: {fontSize: 20, fontWeight: '700', color: '#22c55e'},
-  openButton: {
-    backgroundColor: '#6366f1',
-    padding: 16,
     borderRadius: 12,
-    width: '100%',
-    alignItems: 'center',
+    padding: 10,
+    marginTop: 8,
   },
-  openButtonText: {color: '#fff', fontWeight: '700', fontSize: 16},
-  libraryButton: {padding: 14, width: '100%', alignItems: 'center'},
-  libraryButtonText: {color: '#6366f1', fontWeight: '600', fontSize: 15},
+  warningText: {fontSize: 12, marginBottom: 2},
+  streamContainer: {
+    height: 110,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 8,
+  },
+  streamLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 6,
+  },
+  streamLabel: {fontSize: 12, fontWeight: '600'},
+  streamScroll: {flex: 1},
+  streamText: {fontSize: 12, lineHeight: 18},
+  completionContainer: {
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 16,
+    alignItems: 'stretch',
+    gap: 8,
+    marginBottom: 8,
+  },
+  completionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginBottom: 6,
+  },
+  completionTitle: {fontSize: 19, fontWeight: '700'},
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
+    gap: 12,
   },
-  errorTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#ef4444',
-    marginBottom: 12,
+  errorIconWrap: {
+    width: 68,
+    height: 68,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
   },
+  errorTitle: {fontSize: 22, fontWeight: '800', letterSpacing: -0.4},
   errorMessage: {
     fontSize: 14,
-    color: '#6b7280',
+    lineHeight: 21,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
-  retryButton: {backgroundColor: '#f3f4f6', padding: 14, borderRadius: 10},
-  localButton: {backgroundColor: '#eef2ff'},
-  retryText: {fontWeight: '600', color: '#374151'},
 });

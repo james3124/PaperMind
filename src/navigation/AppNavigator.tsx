@@ -1,9 +1,14 @@
 import React, {Suspense} from 'react';
 import {View, StyleSheet, ActivityIndicator} from 'react-native';
-import {NavigationContainer} from '@react-navigation/native';
+import {
+  NavigationContainer,
+  DefaultTheme,
+  DarkTheme,
+} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import LibraryScreen from '@/screens/LibraryScreen';
 import ModelDownloadBanner from '@/components/ModelDownloadBanner';
+import {useTheme} from '@/theme/theme';
 import type {SourceKey, SourcePaper} from '@/services/literatureSearch';
 
 export type RootStackParamList = {
@@ -52,9 +57,10 @@ const ModelDownloadScreen = React.lazy(
 );
 
 function ScreenFallback() {
+  const {palette} = useTheme();
   return (
-    <View style={styles.fallback}>
-      <ActivityIndicator size="small" color="#6366f1" />
+    <View style={[styles.fallback, {backgroundColor: palette.bg}]}>
+      <ActivityIndicator size="small" color={palette.accent} />
     </View>
   );
 }
@@ -64,15 +70,44 @@ interface Props {
 }
 
 export default function AppNavigator({initialRoute}: Props) {
+  const {palette, isDark} = useTheme();
+
+  const navTheme = {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    dark: isDark,
+    colors: {
+      ...(isDark ? DarkTheme : DefaultTheme).colors,
+      primary: palette.accent,
+      background: palette.bg,
+      card: palette.surface,
+      text: palette.text,
+      border: palette.border,
+      notification: palette.accent,
+    },
+  };
+
   return (
     <View style={styles.root}>
-      <NavigationContainer>
+      <NavigationContainer theme={navTheme}>
         <Suspense fallback={<ScreenFallback />}>
-          <Stack.Navigator initialRouteName={initialRoute}>
+          <Stack.Navigator
+            initialRouteName={initialRoute}
+            screenOptions={{
+              headerStyle: {backgroundColor: palette.bg},
+              headerTintColor: palette.text,
+              headerTitleStyle: {
+                fontWeight: '700',
+                fontSize: 17,
+                color: palette.text,
+              },
+              headerShadowVisible: false,
+              headerBackTitleVisible: false,
+              contentStyle: {backgroundColor: palette.bg},
+            }}>
             <Stack.Screen
               name="Library"
               component={LibraryScreen}
-              options={{title: 'PaperMind'}}
+              options={{headerShown: false}}
             />
             <Stack.Screen
               name="Generate"

@@ -8,7 +8,9 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
-import Document, {STATUS_LABELS, STATUS_COLORS} from '@/db/models/Document';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import Document, {STATUS_LABELS} from '@/db/models/Document';
+import {useTheme} from '@/theme/theme';
 
 interface Props {
   document: Document;
@@ -46,9 +48,21 @@ export default function DocumentCard({
   onDelete,
 }: Props) {
   const [menuVisible, setMenuVisible] = useState(false);
+  const {palette, elevation} = useTheme();
 
-  const statusColor = STATUS_COLORS[document.status] ?? '#9E9E9E';
   const statusLabel = STATUS_LABELS[document.status] ?? 'Draft';
+  const statusColor: Record<string, string> = {
+    draft: palette.textMuted,
+    aiReady: palette.success,
+    analyzing: palette.accent,
+    finalDraft: palette.star,
+  };
+  const statusBg: Record<string, string> = {
+    draft: palette.surfaceAlt,
+    aiReady: palette.successSubtle,
+    analyzing: palette.accentSubtle,
+    finalDraft: palette.warningSubtle,
+  };
 
   function closeMenu() {
     setMenuVisible(false);
@@ -70,7 +84,7 @@ export default function DocumentCard({
 
   const menuActions = [
     {
-      icon: '📤',
+      icon: 'share-outline',
       label: 'Export as DOCX',
       onPress: () => {
         closeMenu();
@@ -78,7 +92,7 @@ export default function DocumentCard({
       },
     },
     {
-      icon: '✅',
+      icon: 'checkmark-done-outline',
       label: 'Mark as Final',
       onPress: () => {
         closeMenu();
@@ -86,7 +100,7 @@ export default function DocumentCard({
       },
     },
     {
-      icon: '📋',
+      icon: 'copy-outline',
       label: 'Duplicate',
       onPress: () => {
         closeMenu();
@@ -94,7 +108,7 @@ export default function DocumentCard({
       },
     },
     {
-      icon: '🗑️',
+      icon: 'trash-outline',
       label: 'Delete',
       destructive: true,
       onPress: confirmDelete,
@@ -104,28 +118,46 @@ export default function DocumentCard({
   return (
     <>
       <TouchableOpacity
-        style={styles.card}
+        style={[
+          styles.card,
+          {
+            backgroundColor: palette.surface,
+            borderColor: palette.border,
+          },
+          elevation.card(palette.shadow),
+        ]}
         onPress={onTap}
         activeOpacity={0.82}>
         {/* Doc icon */}
-        <View style={styles.iconWrap}>
-          <Text style={styles.iconGlyph}>📄</Text>
+        <View
+          style={[styles.iconWrap, {backgroundColor: palette.accentSubtle}]}>
+          <Ionicons name="document-text" size={20} color={palette.accent} />
         </View>
 
         {/* Text content */}
         <View style={styles.content}>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={[styles.title, {color: palette.text}]} numberOfLines={1}>
             {document.title}
           </Text>
-          <Text style={styles.meta}>
+          <Text style={[styles.meta, {color: palette.textMuted}]}>
             {timeAgo(document.updatedAt)}
             {document.wordCount > 0 ? ` · ${document.wordCount} words` : ''}
           </Text>
         </View>
 
         {/* Status badge */}
-        <View style={[styles.badge, {backgroundColor: `${statusColor}18`}]}>
-          <Text style={[styles.badgeText, {color: statusColor}]}>
+        <View
+          style={[
+            styles.badge,
+            {
+              backgroundColor: statusBg[document.status] ?? palette.surfaceAlt,
+            },
+          ]}>
+          <Text
+            style={[
+              styles.badgeText,
+              {color: statusColor[document.status] ?? palette.textMuted},
+            ]}>
             {statusLabel}
           </Text>
         </View>
@@ -135,10 +167,11 @@ export default function DocumentCard({
           style={styles.iconBtn}
           onPress={onStar}
           hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-          <Text
-            style={[styles.starIcon, document.starred && styles.starActive]}>
-            {document.starred ? '★' : '☆'}
-          </Text>
+          <Ionicons
+            name={document.starred ? 'star' : 'star-outline'}
+            size={19}
+            color={document.starred ? palette.star : palette.textMuted}
+          />
         </TouchableOpacity>
 
         {/* More */}
@@ -146,7 +179,11 @@ export default function DocumentCard({
           style={styles.iconBtn}
           onPress={() => setMenuVisible(true)}
           hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-          <Text style={styles.moreIcon}>⋯</Text>
+          <Ionicons
+            name="ellipsis-horizontal"
+            size={18}
+            color={palette.textMuted}
+          />
         </TouchableOpacity>
       </TouchableOpacity>
 
@@ -157,23 +194,27 @@ export default function DocumentCard({
         animationType="slide"
         onRequestClose={closeMenu}>
         <TouchableWithoutFeedback onPress={closeMenu}>
-          <View style={styles.backdrop} />
+          <View style={[styles.backdrop, {backgroundColor: palette.scrim}]} />
         </TouchableWithoutFeedback>
 
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, {backgroundColor: palette.surface}]}>
           {/* Handle */}
-          <View style={styles.sheetHandle} />
+          <View
+            style={[styles.sheetHandle, {backgroundColor: palette.border}]}
+          />
 
           {/* Doc title */}
-          <Text style={styles.sheetTitle} numberOfLines={1}>
+          <Text
+            style={[styles.sheetTitle, {color: palette.text}]}
+            numberOfLines={1}>
             {document.title}
           </Text>
-          <Text style={styles.sheetMeta}>
+          <Text style={[styles.sheetMeta, {color: palette.textMuted}]}>
             {timeAgo(document.updatedAt)}
             {document.wordCount > 0 ? ` · ${document.wordCount} words` : ''}
           </Text>
 
-          <View style={styles.divider} />
+          <View style={[styles.divider, {backgroundColor: palette.border}]} />
 
           {/* Actions */}
           {menuActions.map(action => (
@@ -182,11 +223,16 @@ export default function DocumentCard({
               style={styles.action}
               onPress={action.onPress}
               activeOpacity={0.7}>
-              <Text style={styles.actionIcon}>{action.icon}</Text>
+              <Ionicons
+                name={action.icon}
+                size={20}
+                color={action.destructive ? palette.danger : palette.textSoft}
+                style={styles.actionIcon}
+              />
               <Text
                 style={[
                   styles.actionLabel,
-                  action.destructive && styles.actionDestructive,
+                  {color: action.destructive ? palette.danger : palette.text},
                 ]}>
                 {action.label}
               </Text>
@@ -195,10 +241,12 @@ export default function DocumentCard({
 
           {/* Cancel */}
           <TouchableOpacity
-            style={styles.cancelBtn}
+            style={[styles.cancelBtn, {backgroundColor: palette.surfaceAlt}]}
             onPress={closeMenu}
             activeOpacity={0.7}>
-            <Text style={styles.cancelText}>Cancel</Text>
+            <Text style={[styles.cancelText, {color: palette.textSoft}]}>
+              Cancel
+            </Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -211,88 +259,63 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     marginHorizontal: 16,
     marginVertical: 5,
     padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#f0f0f5',
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
     gap: 10,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    shadowOffset: {width: 0, height: 1},
   },
   iconWrap: {
     width: 42,
     height: 50,
-    backgroundColor: '#eef2ff',
-    borderRadius: 10,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  iconGlyph: {fontSize: 22},
   content: {flex: 1},
-  title: {fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 3},
-  meta: {fontSize: 12, color: '#9ca3af'},
-  badge: {paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20},
+  title: {fontSize: 15, fontWeight: '600', marginBottom: 3},
+  meta: {fontSize: 12, fontVariant: ['tabular-nums']},
+  badge: {paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999},
   badgeText: {fontSize: 11, fontWeight: '700'},
   iconBtn: {padding: 4},
-  starIcon: {fontSize: 18, color: '#d1d5db'},
-  starActive: {color: '#f59e0b'},
-  moreIcon: {fontSize: 20, color: '#9ca3af'},
 
   /* ── Bottom-sheet ──────────────────────────────────────── */
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
+  backdrop: {...StyleSheet.absoluteFillObject},
   sheet: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 12,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 10,
     paddingBottom: 32,
     paddingHorizontal: 20,
-    elevation: 16,
   },
   sheetHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#e5e7eb',
     alignSelf: 'center',
     marginBottom: 16,
   },
-  sheetTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  sheetMeta: {fontSize: 12, color: '#9ca3af', marginBottom: 12},
-  divider: {height: 1, backgroundColor: '#f3f4f6', marginBottom: 8},
+  sheetTitle: {fontSize: 16, fontWeight: '700', marginBottom: 2},
+  sheetMeta: {fontSize: 12, marginBottom: 12},
+  divider: {height: StyleSheet.hairlineWidth, marginBottom: 8},
   action: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 13,
     gap: 14,
   },
-  actionIcon: {fontSize: 20, width: 28, textAlign: 'center'},
-  actionLabel: {fontSize: 15, color: '#111827', fontWeight: '500'},
-  actionDestructive: {color: '#ef4444'},
+  actionIcon: {width: 28, textAlign: 'center'},
+  actionLabel: {fontSize: 15, fontWeight: '500'},
   cancelBtn: {
     marginTop: 8,
     paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#f3f4f6',
+    borderRadius: 14,
     alignItems: 'center',
   },
-  cancelText: {fontSize: 15, fontWeight: '600', color: '#6b7280'},
+  cancelText: {fontSize: 15, fontWeight: '600'},
 });

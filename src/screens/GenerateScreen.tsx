@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   ScrollView,
   StyleSheet,
   KeyboardAvoidingView,
@@ -14,6 +13,9 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '@/navigation/AppNavigator';
 import {useSettingsStore} from '@/stores/settingsStore';
 import {modelExists} from '@/utils/modelPaths';
+import {useTheme} from '@/theme/theme';
+import Button from '@/components/ui/Button';
+import Chip from '@/components/ui/Chip';
 import CitationSheet, {
   CitationChoice,
 } from '@/components/generate/CitationSheet';
@@ -45,6 +47,7 @@ type PaperLength = (typeof PAPER_LENGTHS)[number]['id'];
 
 export default function GenerateScreen({navigation}: Props) {
   const settings = useSettingsStore();
+  const {palette} = useTheme();
 
   const [topic, setTopic] = useState('');
   const [context, setContext] = useState('');
@@ -104,128 +107,111 @@ export default function GenerateScreen({navigation}: Props) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.flex}
+      style={[styles.flex, {backgroundColor: palette.bg}]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <Text style={styles.heading}>New Paper</Text>
-        <Text style={styles.subheading}>
-          Describe your research topic and PaperMind will generate a complete
-          academic paper.
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled">
+        <Text style={[styles.heading, {color: palette.text}]}>New paper</Text>
+        <Text style={[styles.subheading, {color: palette.textSoft}]}>
+          Describe your research topic and PaperMind will plan, cite, and write
+          a complete academic paper.
         </Text>
 
         {/* Topic */}
-        <Label text="Research Topic" required />
+        <Label text="Research topic" required />
         <TextInput
-          style={[styles.input, styles.topicInput]}
+          style={[
+            styles.input,
+            styles.topicInput,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.border,
+              color: palette.text,
+            },
+          ]}
           value={topic}
           onChangeText={setTopic}
           placeholder="e.g. Relationship between daily mobile game playtime and academic performance of Grade 11 students"
+          placeholderTextColor={palette.textMuted}
           multiline
           numberOfLines={3}
           textAlignVertical="top"
         />
 
         {/* Context */}
-        <Label text="Additional Context" />
+        <Label text="Additional context" />
         <TextInput
-          style={[styles.input, styles.contextInput]}
+          style={[
+            styles.input,
+            styles.contextInput,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.border,
+              color: palette.text,
+            },
+          ]}
           value={context}
           onChangeText={setContext}
           placeholder="Any specific focus, institution, or constraints (optional)"
+          placeholderTextColor={palette.textMuted}
           multiline
           numberOfLines={2}
           textAlignVertical="top"
         />
 
         {/* Research type */}
-        <Label text="Research Type" />
+        <Label text="Research type" />
         <View style={styles.chipRow}>
           {RESEARCH_TYPES.map(rt => (
-            <TouchableOpacity
+            <Chip
               key={rt.id}
-              style={[
-                styles.chip,
-                researchType === rt.id && styles.chipSelected,
-              ]}
-              onPress={() => setResearchType(rt.id)}>
-              <Text
-                style={[
-                  styles.chipText,
-                  researchType === rt.id && styles.chipTextSelected,
-                ]}>
-                {rt.label}
-              </Text>
-            </TouchableOpacity>
+              label={rt.label}
+              selected={researchType === rt.id}
+              onPress={() => setResearchType(rt.id)}
+            />
           ))}
         </View>
 
         {/* Academic level */}
-        <Label text="Academic Level" />
+        <Label text="Academic level" />
         <View style={styles.chipRow}>
           {ACADEMIC_LEVELS.map(al => (
-            <TouchableOpacity
+            <Chip
               key={al.id}
-              style={[
-                styles.chip,
-                academicLevel === al.id && styles.chipSelected,
-              ]}
-              onPress={() => setLevel(al.id)}>
-              <Text
-                style={[
-                  styles.chipText,
-                  academicLevel === al.id && styles.chipTextSelected,
-                ]}>
-                {al.label}
-              </Text>
-            </TouchableOpacity>
+              label={al.label}
+              selected={academicLevel === al.id}
+              onPress={() => setLevel(al.id)}
+            />
           ))}
         </View>
 
         {/* Paper length */}
-        <Label text="Paper Length" />
+        <Label text="Paper length" />
         <View style={styles.chipRow}>
           {PAPER_LENGTHS.map(pl => (
-            <TouchableOpacity
+            <Chip
               key={pl.id}
-              style={[
-                styles.chip,
-                paperLength === pl.id && styles.chipSelected,
-              ]}
-              onPress={() => setLength(pl.id)}>
-              <View style={styles.chipInner}>
-                <Text
-                  style={[
-                    styles.chipText,
-                    paperLength === pl.id && styles.chipTextSelected,
-                  ]}>
-                  {pl.label}
-                </Text>
-                <Text
-                  style={[
-                    styles.chipSub,
-                    paperLength === pl.id && styles.chipTextSelected,
-                  ]}>
-                  {pl.sub}
-                </Text>
-              </View>
-            </TouchableOpacity>
+              label={pl.label}
+              sublabel={pl.sub}
+              selected={paperLength === pl.id}
+              onPress={() => setLength(pl.id)}
+            />
           ))}
         </View>
 
         {/* Generate button */}
-        <TouchableOpacity
-          style={[
-            styles.generateButton,
-            !topic.trim() && styles.generateButtonDisabled,
-          ]}
+        <Button
+          label="Generate paper"
           onPress={handleGenerate}
-          disabled={!topic.trim()}>
-          <Text style={styles.generateText}>Generate Paper</Text>
-        </TouchableOpacity>
+          disabled={!topic.trim()}
+          style={styles.generateButton}
+        />
 
         {modelMissing && (
-          <Text style={styles.noKeyWarning}>
-            ⚠️ AI model not loaded — tap "Generate Paper" to download it first.
+          <Text style={[styles.noKeyWarning, {color: palette.warning}]}>
+            AI model not loaded — tap "Generate paper" to download it first.
           </Text>
         )}
       </ScrollView>
@@ -242,10 +228,11 @@ export default function GenerateScreen({navigation}: Props) {
 }
 
 function Label({text, required}: {text: string; required?: boolean}) {
+  const {palette} = useTheme();
   return (
-    <Text style={labelStyles.text}>
+    <Text style={[labelStyles.text, {color: palette.textSoft}]}>
       {text}
-      {required ? <Text style={labelStyles.required}> *</Text> : null}
+      {required ? <Text style={{color: palette.danger}}> *</Text> : null}
     </Text>
   );
 }
@@ -254,55 +241,31 @@ const labelStyles = StyleSheet.create({
   text: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
-    marginTop: 16,
-    marginBottom: 6,
+    marginTop: 20,
+    marginBottom: 8,
   },
-  required: {color: '#ef4444'},
 });
 
 const styles = StyleSheet.create({
-  flex: {flex: 1, backgroundColor: '#fff'},
+  flex: {flex: 1},
   scroll: {flex: 1},
-  content: {padding: 20, paddingBottom: 40},
-  heading: {fontSize: 24, fontWeight: '800', color: '#111827', marginBottom: 6},
-  subheading: {fontSize: 14, color: '#6b7280', marginBottom: 8, lineHeight: 20},
+  content: {paddingHorizontal: 20, paddingBottom: 40},
+  heading: {fontSize: 26, fontWeight: '800', letterSpacing: -0.5, marginTop: 4},
+  subheading: {fontSize: 14, lineHeight: 21, marginBottom: 8, marginTop: 6},
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: 14,
+    padding: 14,
     fontSize: 14,
-    backgroundColor: '#fff',
+    lineHeight: 21,
   },
-  topicInput: {minHeight: 80},
+  topicInput: {minHeight: 88},
   contextInput: {minHeight: 60},
   chipRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8},
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  chipSelected: {backgroundColor: '#6366f1', borderColor: '#6366f1'},
-  chipInner: {alignItems: 'center'},
-  chipText: {fontSize: 13, color: '#374151', fontWeight: '500'},
-  chipTextSelected: {color: '#fff'},
-  chipSub: {fontSize: 10, color: '#9ca3af', marginTop: 1},
-  generateButton: {
-    backgroundColor: '#6366f1',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 28,
-  },
-  generateButtonDisabled: {opacity: 0.4},
-  generateText: {color: '#fff', fontWeight: '700', fontSize: 16},
+  generateButton: {marginTop: 28},
   noKeyWarning: {
     fontSize: 13,
-    color: '#f59e0b',
+    lineHeight: 19,
     textAlign: 'center',
     marginTop: 12,
   },

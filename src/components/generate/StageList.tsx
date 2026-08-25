@@ -6,6 +6,8 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import {useTheme} from '@/theme/theme';
 
 interface Props {
   stages: string[];
@@ -20,6 +22,8 @@ export default function StageList({
   completedStages,
   errorStages,
 }: Props) {
+  const {palette} = useTheme();
+
   return (
     <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
       {stages.map((label, i) => {
@@ -27,26 +31,68 @@ export default function StageList({
         const done = completedStages.has(num);
         const active = currentStage === num && !done;
         const errored = errorStages.has(num);
+        const last = i === stages.length - 1;
 
         return (
-          <View key={num} style={[styles.row, active && styles.activeRow]}>
-            <View style={styles.icon}>
-              {done && <Text style={styles.check}>✓</Text>}
-              {active && <ActivityIndicator size="small" color="#6366f1" />}
-              {errored && !done && <Text style={styles.errorIcon}>✗</Text>}
-              {!done && !active && !errored && (
-                <Text style={styles.pending}>{num}</Text>
-              )}
+          <View key={num} style={styles.rowWrap}>
+            {!last && (
+              <View
+                style={[
+                  styles.rail,
+                  styles.railSpan,
+                  {
+                    backgroundColor:
+                      done || (errored && !done)
+                        ? palette.border
+                        : palette.surfaceAlt,
+                  },
+                ]}
+              />
+            )}
+            <View style={styles.row}>
+              <View
+                style={[
+                  styles.icon,
+                  !done &&
+                    !active &&
+                    !errored && {
+                      backgroundColor: palette.surfaceAlt,
+                    },
+                ]}>
+                {done && (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={24}
+                    color={palette.success}
+                  />
+                )}
+                {active && (
+                  <ActivityIndicator size="small" color={palette.accent} />
+                )}
+                {errored && !done && (
+                  <Ionicons
+                    name="close-circle"
+                    size={24}
+                    color={palette.danger}
+                  />
+                )}
+                {!done && !active && !errored && (
+                  <Text style={[styles.pending, {color: palette.textMuted}]}>
+                    {num}
+                  </Text>
+                )}
+              </View>
+              <Text
+                style={[
+                  styles.label,
+                  {color: palette.textMuted},
+                  done && {color: palette.textSoft},
+                  active && [styles.activeLabel, {color: palette.accent}],
+                  errored && !done && {color: palette.danger},
+                ]}>
+                {label}
+              </Text>
             </View>
-            <Text
-              style={[
-                styles.label,
-                done && styles.doneLabel,
-                active && styles.activeLabel,
-                errored && !done && styles.errorLabel,
-              ]}>
-              {label}
-            </Text>
           </View>
         );
       })}
@@ -56,24 +102,33 @@ export default function StageList({
 
 const styles = StyleSheet.create({
   scroll: {flex: 1},
+  rowWrap: {position: 'relative'},
+  rail: {
+    position: 'absolute',
+    left: 17,
+    width: 2,
+    borderRadius: 1,
+  },
+  railSpan: {top: 28, bottom: -6},
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 4,
+    paddingVertical: 8,
     gap: 14,
+    backgroundColor: 'transparent',
   },
-  activeRow: {
-    backgroundColor: '#f0f0ff',
-    borderRadius: 8,
-    marginHorizontal: -4,
+  icon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  icon: {width: 28, height: 28, alignItems: 'center', justifyContent: 'center'},
-  check: {fontSize: 18, color: '#22c55e'},
-  errorIcon: {fontSize: 16, color: '#ef4444'},
-  pending: {fontSize: 13, color: '#d1d5db', fontWeight: '600'},
-  label: {fontSize: 14, color: '#9ca3af', flex: 1},
-  doneLabel: {color: '#374151'},
-  activeLabel: {color: '#6366f1', fontWeight: '600'},
-  errorLabel: {color: '#ef4444'},
+  pending: {
+    fontSize: 13,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  label: {fontSize: 14, flex: 1},
+  activeLabel: {fontWeight: '600'},
 });

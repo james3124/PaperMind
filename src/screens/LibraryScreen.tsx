@@ -12,12 +12,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import type {RootStackParamList} from '@/navigation/AppNavigator';
 import {database} from '@/db/database';
 import Document from '@/db/models/Document';
 import {documentRepository} from '@/db/DocumentRepository';
 import {importDocxFromUri} from '@/services/paperFileStore';
 import {shareExistingDocx} from '@/services/exportContent';
+import {useTheme} from '@/theme/theme';
+import Button from '@/components/ui/Button';
 import DocumentCard from '@/components/library/DocumentCard';
 import DocumentPicker from 'react-native-document-picker';
 
@@ -41,6 +45,8 @@ const SORT_LABELS: Record<SortOption, string> = {
 };
 
 export default function LibraryScreen({navigation}: Props) {
+  const {palette, elevation} = useTheme();
+  const insets = useSafeAreaInsets();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [query, setQuery] = useState('');
   const [starredOnly, setStarredOnly] = useState(false);
@@ -131,6 +137,7 @@ export default function LibraryScreen({navigation}: Props) {
   }
 
   async function handleNewPaper() {
+    setFabOpen(false);
     navigation.navigate('Generate');
   }
 
@@ -166,26 +173,46 @@ export default function LibraryScreen({navigation}: Props) {
     }
   }
 
+  const busy = importing || exportingId !== null;
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, {backgroundColor: palette.bg}]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.appName}>PaperMind</Text>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: palette.bg,
+            paddingTop: insets.top + 10,
+            borderBottomColor: palette.border,
+          },
+        ]}>
+        <Text style={[styles.appName, {color: palette.text}]}>
+          Paper<Text style={{color: palette.accent}}>Mind</Text>
+        </Text>
         <View style={styles.headerActions}>
-          {importing && <ActivityIndicator size="small" color="#6366f1" />}
-          {exportingId && <ActivityIndicator size="small" color="#6366f1" />}
-          <TouchableOpacity onPress={handleImport} style={styles.headerBtn}>
-            <Text style={styles.headerBtnText}>📂</Text>
+          {busy && <ActivityIndicator size="small" color={palette.accent} />}
+          <TouchableOpacity
+            onPress={handleImport}
+            style={styles.headerBtn}
+            accessibilityLabel="Import DOCX">
+            <Ionicons name="share-outline" size={21} color={palette.textSoft} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setShowSortMenu(v => !v)}
-            style={styles.headerBtn}>
-            <Text style={styles.headerBtnText}>⇅</Text>
+            style={styles.headerBtn}
+            accessibilityLabel="Sort papers">
+            <Ionicons name="swap-vertical" size={21} color={palette.textSoft} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => navigation.navigate('Settings')}
-            style={styles.headerBtn}>
-            <Text style={styles.headerBtnText}>⚙️</Text>
+            style={styles.headerBtn}
+            accessibilityLabel="Settings">
+            <Ionicons
+              name="settings-outline"
+              size={21}
+              color={palette.textSoft}
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -197,26 +224,44 @@ export default function LibraryScreen({navigation}: Props) {
         animationType="fade"
         onRequestClose={() => setShowSortMenu(false)}>
         <TouchableWithoutFeedback onPress={() => setShowSortMenu(false)}>
-          <View style={styles.sortBackdrop} />
+          <View style={[styles.backdrop, {backgroundColor: palette.scrim}]} />
         </TouchableWithoutFeedback>
-        <View style={styles.sortMenu}>
-          <Text style={styles.sortMenuTitle}>Sort by</Text>
+        <View
+          style={[
+            styles.menu,
+            styles.sortMenu,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.border,
+              marginTop: insets.top + 52,
+            },
+            elevation.raised(palette.shadow),
+          ]}>
+          <Text style={[styles.menuTitle, {color: palette.textMuted}]}>
+            Sort by
+          </Text>
           {(Object.keys(SORT_LABELS) as SortOption[]).map(s => (
             <TouchableOpacity
               key={s}
-              style={[styles.sortItem, sort === s && styles.sortItemActive]}
+              style={styles.menuItem}
               onPress={() => {
                 setSort(s);
                 setShowSortMenu(false);
               }}>
               <Text
                 style={[
-                  styles.sortItemText,
-                  sort === s && styles.sortItemTextActive,
+                  styles.menuItemText,
+                  {color: palette.text},
+                  sort === s && [
+                    styles.menuItemTextActive,
+                    {color: palette.accent},
+                  ],
                 ]}>
                 {SORT_LABELS[s]}
               </Text>
-              {sort === s && <Text style={styles.sortCheck}>✓</Text>}
+              {sort === s && (
+                <Ionicons name="checkmark" size={17} color={palette.accent} />
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -224,9 +269,21 @@ export default function LibraryScreen({navigation}: Props) {
 
       {/* Offline banner */}
       {isOffline && (
-        <View style={styles.offlineBanner}>
-          <Text style={styles.offlineText}>
-            📡 Offline — Literature search unavailable
+        <View
+          style={[
+            styles.offlineBanner,
+            {
+              backgroundColor: palette.warningSubtle,
+              borderBottomColor: palette.border,
+            },
+          ]}>
+          <Ionicons
+            name="cloud-offline-outline"
+            size={15}
+            color={palette.warning}
+          />
+          <Text style={[styles.offlineText, {color: palette.warning}]}>
+            Offline — literature search unavailable
           </Text>
           <TouchableOpacity
             onPress={() => {
@@ -234,24 +291,60 @@ export default function LibraryScreen({navigation}: Props) {
                 .then(() => setIsOffline(false))
                 .catch(() => {});
             }}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={[styles.retryText, {color: palette.accent}]}>
+              Retry
+            </Text>
           </TouchableOpacity>
         </View>
       )}
 
       {/* Search + filter */}
       <View style={styles.searchRow}>
-        <TextInput
-          style={styles.searchInput}
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search papers…"
-          clearButtonMode="while-editing"
-        />
+        <View
+          style={[styles.searchField, {backgroundColor: palette.surfaceAlt}]}>
+          <Ionicons
+            name="search"
+            size={17}
+            color={palette.textMuted}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={[styles.searchInput, {color: palette.text}]}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search papers…"
+            placeholderTextColor={palette.textMuted}
+          />
+          {query.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setQuery('')}
+              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+              <Ionicons
+                name="close-circle"
+                size={16}
+                color={palette.textMuted}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
         <TouchableOpacity
-          style={[styles.filterBtn, starredOnly && styles.filterBtnActive]}
-          onPress={() => setStarredOnly(v => !v)}>
-          <Text>⭐</Text>
+          style={[
+            styles.filterBtn,
+            {
+              backgroundColor: starredOnly
+                ? palette.accentSubtle
+                : palette.surfaceAlt,
+              borderColor: starredOnly ? palette.accent : 'transparent',
+            },
+          ]}
+          onPress={() => setStarredOnly(v => !v)}
+          accessibilityLabel="Show starred only"
+          activeOpacity={0.7}>
+          <Ionicons
+            name={starredOnly ? 'star' : 'star-outline'}
+            size={18}
+            color={starredOnly ? palette.star : palette.textMuted}
+          />
         </TouchableOpacity>
       </View>
 
@@ -264,12 +357,34 @@ export default function LibraryScreen({navigation}: Props) {
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>📝</Text>
-            <Text style={styles.emptyTitle}>No papers yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Tap + to generate a research paper with AI or start a blank
-              document
+            <View
+              style={[
+                styles.emptyIconWrap,
+                {backgroundColor: palette.accentSubtle},
+              ]}>
+              <Ionicons
+                name="document-text-outline"
+                size={30}
+                color={palette.accent}
+              />
+            </View>
+            <Text style={[styles.emptyTitle, {color: palette.text}]}>
+              No papers yet
             </Text>
+            <Text style={[styles.emptySubtitle, {color: palette.textMuted}]}>
+              Generate a full research paper with on-device AI, or start from a
+              blank page.
+            </Text>
+            <Button
+              label="Generate with AI"
+              onPress={handleNewPaper}
+              style={styles.emptyCta}
+            />
+            <Button
+              label="Start blank document"
+              variant="ghost"
+              onPress={createBlankDocument}
+            />
           </View>
         }
         renderItem={({item}) => (
@@ -296,163 +411,171 @@ export default function LibraryScreen({navigation}: Props) {
         animationType="fade"
         onRequestClose={() => setFabOpen(false)}>
         <TouchableWithoutFeedback onPress={() => setFabOpen(false)}>
-          <View style={styles.sortBackdrop} />
+          <View style={[styles.backdrop, {backgroundColor: palette.scrim}]} />
         </TouchableWithoutFeedback>
-        <View style={styles.fabMenu}>
-          <Text style={styles.sortMenuTitle}>New document</Text>
-          <TouchableOpacity
-            style={styles.sortItem}
-            onPress={() => {
-              setFabOpen(false);
-              handleNewPaper();
-            }}>
-            <Text style={styles.sortItemText}>Generate with AI</Text>
+        <View
+          style={[
+            styles.menu,
+            styles.fabMenu,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.border,
+              marginBottom: insets.bottom + 96,
+            },
+            elevation.raised(palette.shadow),
+          ]}>
+          <Text style={[styles.menuTitle, {color: palette.textMuted}]}>
+            New document
+          </Text>
+          <TouchableOpacity style={styles.menuItem} onPress={handleNewPaper}>
+            <Ionicons
+              name="sparkles-outline"
+              size={18}
+              color={palette.accent}
+            />
+            <Text style={[styles.menuItemText, {color: palette.text}]}>
+              Generate with AI
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.sortItem}
+            style={styles.menuItem}
             onPress={createBlankDocument}>
-            <Text style={styles.sortItemText}>New blank document</Text>
+            <Ionicons
+              name="create-outline"
+              size={18}
+              color={palette.textSoft}
+            />
+            <Text style={[styles.menuItemText, {color: palette.text}]}>
+              New blank document
+            </Text>
           </TouchableOpacity>
         </View>
       </Modal>
 
       {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={() => setFabOpen(v => !v)}>
-        <Text style={styles.fabText}>+</Text>
+      <TouchableOpacity
+        style={[
+          styles.fab,
+          {backgroundColor: palette.accent},
+          elevation.floating(palette.shadow),
+        ]}
+        onPress={() => setFabOpen(v => !v)}
+        activeOpacity={0.85}
+        accessibilityLabel="New document">
+        <Ionicons
+          name={fabOpen ? 'close' : 'add'}
+          size={28}
+          color={palette.onAccent}
+        />
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#fafafa', zIndex: 0},
+  container: {flex: 1, zIndex: 0},
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 10,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  appName: {fontSize: 22, fontWeight: '800', color: '#6366f1'},
-  headerActions: {flexDirection: 'row', alignItems: 'center', gap: 8},
-  headerBtn: {padding: 6},
-  headerBtnText: {fontSize: 20},
-  sortBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-  },
-  sortMenu: {
+  appName: {fontSize: 26, fontWeight: '300', letterSpacing: -0.5},
+  headerActions: {flexDirection: 'row', alignItems: 'center', gap: 4},
+  headerBtn: {padding: 8},
+  backdrop: {...StyleSheet.absoluteFillObject},
+  menu: {
     position: 'absolute',
-    top: 60,
     right: 16,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 8,
-    minWidth: 200,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    minWidth: 210,
     overflow: 'hidden',
+    paddingVertical: 6,
   },
-  sortMenuTitle: {
+  sortMenu: {},
+  fabMenu: {bottom: 0},
+  menuTitle: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#9ca3af',
-    letterSpacing: 0.8,
+    letterSpacing: 0.9,
     textTransform: 'uppercase',
     paddingHorizontal: 18,
-    paddingTop: 14,
+    paddingTop: 12,
     paddingBottom: 6,
   },
-  sortItem: {
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 12,
     paddingHorizontal: 18,
     paddingVertical: 13,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
   },
-  sortItemActive: {backgroundColor: '#fafafe'},
-  sortItemText: {fontSize: 15, color: '#374151'},
-  sortItemTextActive: {color: '#6366f1', fontWeight: '600'},
-  sortCheck: {fontSize: 14, color: '#6366f1', fontWeight: '700'},
-  fabMenu: {
-    position: 'absolute',
-    bottom: 96,
-    right: 24,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 8,
-    minWidth: 220,
-    overflow: 'hidden',
-  },
+  menuItemText: {fontSize: 15},
+  menuItemTextActive: {fontWeight: '600'},
   offlineBanner: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#fff7ed',
+    gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#fed7aa',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  offlineText: {fontSize: 13, color: '#92400e'},
-  retryText: {fontSize: 13, color: '#d97706', fontWeight: '600'},
+  offlineText: {fontSize: 13, flex: 1},
+  retryText: {fontSize: 13, fontWeight: '600'},
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: 12,
+    paddingBottom: 8,
     gap: 8,
-    backgroundColor: '#fff',
   },
-  searchInput: {
+  searchField: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-    backgroundColor: '#f9fafb',
+    height: 42,
   },
+  searchIcon: {marginRight: 8},
+  searchInput: {flex: 1, fontSize: 14, paddingVertical: 0},
   filterBtn: {
-    padding: 8,
-    borderRadius: 10,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#f9fafb',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  filterBtnActive: {backgroundColor: '#eef2ff', borderColor: '#6366f1'},
-  listContent: {paddingVertical: 8},
-  emptyContainer: {flex: 1},
+  listContent: {paddingBottom: 96},
+  emptyContainer: {flexGrow: 1},
   empty: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 80,
-    gap: 12,
+    paddingHorizontal: 40,
+    gap: 10,
   },
-  emptyIcon: {fontSize: 48},
-  emptyTitle: {fontSize: 18, fontWeight: '700', color: '#374151'},
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  emptyTitle: {fontSize: 19, fontWeight: '700'},
   emptySubtitle: {
     fontSize: 14,
-    color: '#9ca3af',
+    lineHeight: 21,
     textAlign: 'center',
-    paddingHorizontal: 40,
+    marginBottom: 16,
   },
+  emptyCta: {alignSelf: 'stretch', marginBottom: 4},
   fab: {
     position: 'absolute',
     bottom: 24,
@@ -460,10 +583,7 @@ const styles = StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: 29,
-    backgroundColor: '#6366f1',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 6,
   },
-  fabText: {fontSize: 28, color: '#fff', lineHeight: 32},
 });

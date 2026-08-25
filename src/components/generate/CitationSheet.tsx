@@ -1,5 +1,9 @@
 import React, {useState} from 'react';
 import {View, Text, Modal, TouchableOpacity, StyleSheet} from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import {useTheme} from '@/theme/theme';
+import Button from '@/components/ui/Button';
+import Chip from '@/components/ui/Chip';
 
 export interface CitationChoice {
   style: string;
@@ -44,6 +48,7 @@ export default function CitationSheet({
 }: Props) {
   const [style, setStyle] = useState(initialStyle);
   const [edition, setEdition] = useState(initialEdition);
+  const {palette} = useTheme();
 
   function handleStyleChange(id: string) {
     setStyle(id);
@@ -60,68 +65,63 @@ export default function CitationSheet({
       transparent
       animationType="slide"
       onRequestClose={onDismiss}>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
+      <View style={[styles.overlay, {backgroundColor: palette.scrim}]}>
+        <View style={[styles.sheet, {backgroundColor: palette.surface}]}>
+          <View style={styles.handleWrap}>
+            <View style={[styles.handle, {backgroundColor: palette.border}]} />
+          </View>
           <View style={styles.header}>
-            <Text style={styles.title}>Citation Style</Text>
-            <TouchableOpacity onPress={onDismiss}>
-              <Text style={styles.close}>✕</Text>
+            <Text style={[styles.title, {color: palette.text}]}>
+              Citation style
+            </Text>
+            <TouchableOpacity
+              onPress={onDismiss}
+              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+              <Ionicons name="close" size={22} color={palette.textMuted} />
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.subtitle}>
+          <Text style={[styles.subtitle, {color: palette.textSoft}]}>
             Choose the citation format for your paper's references.
           </Text>
 
           {/* Style chips */}
           <View style={styles.chipRow}>
             {STYLES.map(s => (
-              <TouchableOpacity
+              <Chip
                 key={s.id}
-                style={[styles.chip, style === s.id && styles.chipSelected]}
-                onPress={() => handleStyleChange(s.id)}>
-                <Text
-                  style={[
-                    styles.chipText,
-                    style === s.id && styles.chipTextSelected,
-                  ]}>
-                  {s.label}
-                </Text>
-              </TouchableOpacity>
+                label={s.label}
+                selected={style === s.id}
+                onPress={() => handleStyleChange(s.id)}
+              />
             ))}
           </View>
 
           {/* Edition chips */}
           {editions && (
             <>
-              <Text style={styles.editionLabel}>Edition</Text>
+              <Text style={[styles.editionLabel, {color: palette.textSoft}]}>
+                Edition
+              </Text>
               <View style={styles.chipRow}>
                 {editions.map(ed => (
-                  <TouchableOpacity
+                  <Chip
                     key={ed}
-                    style={[styles.chip, edition === ed && styles.chipSelected]}
-                    onPress={() => setEdition(ed)}>
-                    <Text
-                      style={[
-                        styles.chipText,
-                        edition === ed && styles.chipTextSelected,
-                      ]}>
-                      {ed}
-                    </Text>
-                  </TouchableOpacity>
+                    label={ed}
+                    selected={edition === ed}
+                    onPress={() => setEdition(ed)}
+                  />
                 ))}
               </View>
             </>
           )}
 
-          <TouchableOpacity
+          <Button
+            label={`Use ${styleName}${edition ? ` · ${edition}` : ''}`}
+            variant="primary"
+            onPress={() => onConfirm({style, edition})}
             style={styles.confirmButton}
-            onPress={() => onConfirm({style, edition})}>
-            <Text style={styles.confirmText}>
-              Use {styleName}
-              {edition ? ` · ${edition}` : ''}
-            </Text>
-          </TouchableOpacity>
+          />
         </View>
       </View>
     </Modal>
@@ -132,48 +132,30 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 10,
     paddingBottom: 40,
   },
+  handleWrap: {alignItems: 'center', marginBottom: 14},
+  handle: {width: 36, height: 4, borderRadius: 2},
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  title: {fontSize: 18, fontWeight: '700', color: '#111827'},
-  close: {fontSize: 18, color: '#6b7280'},
-  subtitle: {fontSize: 13, color: '#6b7280', marginBottom: 16},
+  title: {fontSize: 19, fontWeight: '700'},
+  subtitle: {fontSize: 13, lineHeight: 19, marginBottom: 18},
   chipRow: {flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12},
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  chipSelected: {backgroundColor: '#6366f1', borderColor: '#6366f1'},
-  chipText: {fontSize: 14, color: '#374151', fontWeight: '500'},
-  chipTextSelected: {color: '#fff'},
   editionLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
+    marginTop: 6,
     marginBottom: 8,
   },
-  confirmButton: {
-    backgroundColor: '#6366f1',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  confirmText: {color: '#fff', fontWeight: '700', fontSize: 16},
+  confirmButton: {marginTop: 12},
 });

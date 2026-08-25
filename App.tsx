@@ -5,6 +5,8 @@ import {DatabaseProvider} from '@nozbe/watermelondb/DatabaseProvider';
 import {database} from '@/db/database';
 import AppNavigator from '@/navigation/AppNavigator';
 import {useModelDownloadStore} from '@/stores/modelDownloadStore';
+import {useSettingsStore} from '@/stores/settingsStore';
+import {ThemeProvider} from '@/theme/theme';
 import {modelExists, getModelPath} from '@/utils/modelPaths';
 
 interface EBState {
@@ -29,8 +31,17 @@ class ErrorBoundary extends Component<{children: ReactNode}, EBState> {
   }
 }
 
+function Wordmark() {
+  return (
+    <Text style={styles.wordmark}>
+      Paper<Text style={styles.wordmarkAccent}>Mind</Text>
+    </Text>
+  );
+}
+
 export default function App() {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const themePreference = useSettingsStore(s => s.theme);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,8 +87,13 @@ export default function App() {
 
   if (isBootstrapping) {
     return (
-      <View style={styles.errorContainer}>
-        <ActivityIndicator size="large" color="#6366f1" />
+      <View style={styles.splash}>
+        <Wordmark />
+        <ActivityIndicator
+          size="small"
+          color="#58b4a5"
+          style={styles.splashSpinner}
+        />
       </View>
     );
   }
@@ -85,27 +101,48 @@ export default function App() {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <DatabaseProvider database={database}>
-          <AppNavigator initialRoute="Library" />
-        </DatabaseProvider>
+        <ThemeProvider preference={themePreference}>
+          <DatabaseProvider database={database}>
+            <AppNavigator initialRoute="Library" />
+          </DatabaseProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </ErrorBoundary>
   );
 }
 
 const styles = StyleSheet.create({
+  splash: {
+    flex: 1,
+    backgroundColor: '#141311',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  wordmark: {
+    fontSize: 32,
+    fontWeight: '300',
+    color: '#ece9e0',
+    letterSpacing: -0.6,
+  },
+  wordmarkAccent: {fontWeight: '800', color: '#58b4a5'},
+  splashSpinner: {marginTop: 24},
   errorContainer: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#141311',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   errorTitle: {
-    color: '#f87171',
+    color: '#e8897d',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
     marginBottom: 12,
   },
-  errorMsg: {color: '#94a3b8', fontSize: 13, textAlign: 'center'},
+  errorMsg: {
+    color: '#b3ada0',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 });

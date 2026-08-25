@@ -1,10 +1,21 @@
 import React, {useState} from 'react';
-import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  useWindowDimensions,
+} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import RNFS from 'react-native-fs';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '@/navigation/AppNavigator';
 import {MODEL_URL, getModelPath, ensureModelDir} from '@/utils/modelPaths';
 import {initModel} from '@/services/llamaService';
+import {useTheme} from '@/theme/theme';
+import Button from '@/components/ui/Button';
+import ProgressBar from '@/components/ui/ProgressBar';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ModelDownload'>;
 
@@ -15,6 +26,21 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const FACTS = [
+  {
+    icon: 'hardware-chip-outline',
+    label: 'Model',
+    value: 'Qwen2.5-0.5B-Instruct',
+  },
+  {icon: 'download-outline', label: 'Size', value: '~676 MB'},
+  {icon: 'globe-outline', label: 'Source', value: 'HuggingFace'},
+  {
+    icon: 'lock-closed-outline',
+    label: 'After download',
+    value: 'Fully offline',
+  },
+] as const;
+
 export default function ModelDownloadScreen({navigation}: Props) {
   const [status, setStatus] = useState<
     'idle' | 'downloading' | 'loading' | 'done' | 'error'
@@ -23,6 +49,9 @@ export default function ModelDownloadScreen({navigation}: Props) {
   const [downloaded, setDownloaded] = useState(0);
   const [total, setTotal] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
+  const {palette} = useTheme();
+  const insets = useSafeAreaInsets();
+  const {height} = useWindowDimensions();
 
   let downloadJob: {jobId: number} | null = null;
 
@@ -81,79 +110,113 @@ export default function ModelDownloadScreen({navigation}: Props) {
   }
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {backgroundColor: palette.bg, paddingTop: insets.top + 24},
+      ]}>
       {/* Header */}
-      <Text style={styles.title}>PaperMind</Text>
-      <Text style={styles.subtitle}>AI-powered academic paper editor</Text>
+      <Text style={[styles.title, {color: palette.text}]}>
+        Paper<Text style={{color: palette.accent}}>Mind</Text>
+      </Text>
+      <Text style={[styles.subtitle, {color: palette.textSoft}]}>
+        One download and your phone writes papers — no internet or API key
+        needed after this.
+      </Text>
 
-      {/* Model info card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Local AI Model Required</Text>
-        <Text style={styles.cardBody}>
-          PaperMind uses an on-device AI model to generate and edit papers — no
-          internet or API key needed after download.
-        </Text>
-        <View style={styles.modelInfo}>
-          <Text style={styles.modelInfoRow}>
-            📦 <Text style={styles.bold}>Model:</Text> Qwen2.5-0.5B-Instruct
-          </Text>
-          <Text style={styles.modelInfoRow}>
-            💾 <Text style={styles.bold}>Size:</Text> ~676 MB
-          </Text>
-          <Text style={styles.modelInfoRow}>
-            🌐 <Text style={styles.bold}>Source:</Text> HuggingFace
-          </Text>
-          <Text style={styles.modelInfoRow}>
-            🔒 <Text style={styles.bold}>After download:</Text> Fully offline
-          </Text>
-        </View>
+      {/* Facts */}
+      <View
+        style={[
+          styles.factsCard,
+          {
+            backgroundColor: palette.surface,
+            borderColor: palette.border,
+          },
+        ]}>
+        {FACTS.map((f, i) => (
+          <View
+            key={f.label}
+            style={[
+              styles.factRow,
+              i < FACTS.length - 1 && {
+                borderBottomWidth: StyleSheet.hairlineWidth,
+                borderBottomColor: palette.border,
+              },
+            ]}>
+            <View
+              style={[
+                styles.factIconWrap,
+                {backgroundColor: palette.accentSubtle},
+              ]}>
+              <Ionicons name={f.icon} size={17} color={palette.accent} />
+            </View>
+            <Text style={[styles.factLabel, {color: palette.textMuted}]}>
+              {f.label}
+            </Text>
+            <Text
+              style={[styles.factValue, {color: palette.text}]}
+              numberOfLines={1}>
+              {f.value}
+            </Text>
+          </View>
+        ))}
       </View>
 
       {/* Progress */}
       {(status === 'downloading' || status === 'loading') && (
         <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View
-              style={[styles.progressFill, {width: `${progress * 100}%`}]}
-            />
-          </View>
+          <ProgressBar progress={progress} height={8} />
           {status === 'downloading' && (
-            <Text style={styles.progressText}>
+            <Text style={[styles.progressText, {color: palette.textSoft}]}>
               {formatBytes(downloaded)} /{' '}
-              {total > 0 ? formatBytes(total) : '676 MB'} (
-              {Math.round(progress * 100)}%)
+              {total > 0 ? formatBytes(total) : '676 MB'} ·{' '}
+              {Math.round(progress * 100)}%
             </Text>
           )}
           {status === 'loading' && (
-            <Text style={styles.progressText}>Loading model into memory…</Text>
+            <Text style={[styles.progressText, {color: palette.textSoft}]}>
+              Loading model into memory…
+            </Text>
           )}
         </View>
       )}
 
       {/* Error */}
       {status === 'error' && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>Download failed: {errorMsg}</Text>
-          <Text style={styles.errorHint}>
-            Check your internet connection and try again.
+        <View
+          style={[styles.errorBox, {backgroundColor: palette.dangerSubtle}]}>
+          <Ionicons name="alert-circle" size={16} color={palette.danger} />
+          <Text style={[styles.errorText, {color: palette.danger}]}>
+            Download failed: {errorMsg}
           </Text>
         </View>
       )}
 
       {/* Actions */}
       {(status === 'idle' || status === 'error') && (
-        <TouchableOpacity style={styles.downloadBtn} onPress={startDownload}>
-          <Text style={styles.downloadBtnText}>
-            {status === 'error' ? 'Retry Download' : 'Download Model (676 MB)'}
+        <Button
+          label={
+            status === 'error' ? 'Retry download' : 'Download model (676 MB)'
+          }
+          onPress={startDownload}
+        />
+      )}
+
+      {status === 'downloading' && (
+        <TouchableOpacity onPress={cancelDownload} style={styles.cancelBtn}>
+          <Text style={[styles.cancelBtnText, {color: palette.textMuted}]}>
+            Cancel
           </Text>
         </TouchableOpacity>
       )}
 
-      {status === 'downloading' && (
-        <TouchableOpacity style={styles.cancelBtn} onPress={cancelDownload}>
-          <Text style={styles.cancelBtnText}>Cancel</Text>
-        </TouchableOpacity>
-      )}
+      <Text
+        style={[
+          styles.footerNote,
+          {color: palette.textMuted, marginTop: Math.min(height * 0.06, 48)},
+        ]}>
+        Your papers never leave your device.
+      </Text>
     </View>
   );
 }
@@ -161,66 +224,70 @@ export default function ModelDownloadScreen({navigation}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 24,
+    paddingHorizontal: 24,
     justifyContent: 'center',
   },
   title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#6366f1',
+    fontSize: 34,
+    fontWeight: '300',
+    letterSpacing: -0.8,
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: 10,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    lineHeight: 21,
     textAlign: 'center',
     marginBottom: 32,
+    paddingHorizontal: 12,
   },
-  card: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 16,
-    padding: 20,
+  factsCard: {
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 28,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    paddingHorizontal: 4,
   },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 10,
+  factRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 12,
   },
-  cardBody: {fontSize: 14, color: '#6b7280', lineHeight: 20, marginBottom: 16},
-  modelInfo: {gap: 6},
-  modelInfoRow: {fontSize: 14, color: '#374151'},
-  bold: {fontWeight: '600'},
-  progressContainer: {marginBottom: 20},
-  progressBar: {
-    height: 8,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressFill: {height: '100%', backgroundColor: '#6366f1', borderRadius: 4},
-  progressText: {fontSize: 13, color: '#6b7280', textAlign: 'center'},
-  errorBox: {
-    backgroundColor: '#fef2f2',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 16,
-  },
-  errorText: {fontSize: 13, color: '#dc2626', marginBottom: 4},
-  errorHint: {fontSize: 12, color: '#9ca3af'},
-  downloadBtn: {
-    backgroundColor: '#6366f1',
-    padding: 18,
-    borderRadius: 14,
+  factIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  downloadBtnText: {color: '#fff', fontWeight: '700', fontSize: 16},
+  factLabel: {
+    fontSize: 13,
+    width: 110,
+  },
+  factValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  progressContainer: {marginBottom: 20},
+  progressText: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 8,
+    fontVariant: ['tabular-nums'],
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: 12,
+    padding: 13,
+    marginBottom: 16,
+  },
+  errorText: {fontSize: 13, lineHeight: 18, flex: 1},
   cancelBtn: {marginTop: 12, padding: 14, alignItems: 'center'},
-  cancelBtnText: {color: '#6b7280', fontWeight: '600', fontSize: 15},
+  cancelBtnText: {fontWeight: '600', fontSize: 15},
+  footerNote: {fontSize: 12, textAlign: 'center'},
 });
