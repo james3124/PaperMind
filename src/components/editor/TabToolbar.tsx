@@ -5,9 +5,13 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  StyleProp,
+  TextStyle,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import type {PaperSize} from '@/stores/settingsStore';
+import StyleBar from '@/components/editor/StyleBar';
 
 type Tab = 'Home' | 'Insert' | 'Layout' | 'References' | 'Review' | 'View';
 const TABS: Tab[] = [
@@ -45,6 +49,14 @@ interface Props {
   onAiAction: () => void;
   onCitations: () => void;
   onChat: () => void;
+  onInsertToc: () => void;
+  onInsertFootnote: () => void;
+  onSnapshots: () => void;
+  fontSize: number;
+  fontKey: string;
+  onStyle: (key: string, value: unknown) => void;
+  onFontChange: (key: string) => void;
+  onFontSizeChange: (size: number) => void;
   wordCount: number;
 }
 
@@ -67,6 +79,14 @@ export default function TabToolbar({
   onAiAction,
   onCitations,
   onChat,
+  onInsertToc,
+  onInsertFootnote,
+  onSnapshots,
+  fontSize,
+  fontKey,
+  onStyle,
+  onFontChange,
+  onFontSizeChange,
   wordCount,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('Home');
@@ -78,23 +98,37 @@ export default function TabToolbar({
 
   function Btn({
     icon,
+    iconSet = 'ion',
     label,
+    labelStyle,
     active,
     onPress,
   }: {
     icon?: string;
+    iconSet?: 'ion' | 'mci';
     label?: string;
+    labelStyle?: StyleProp<TextStyle>;
     active?: boolean;
     onPress: () => void;
   }) {
+    const color = active ? '#fff' : '#374151';
     return (
       <TouchableOpacity
         style={[styles.btn, active && styles.btnActive]}
         onPress={onPress}>
         {icon ? (
-          <Ionicons name={icon} size={18} color={active ? '#fff' : '#374151'} />
+          iconSet === 'mci' ? (
+            <MaterialCommunityIcons name={icon} size={18} color={color} />
+          ) : (
+            <Ionicons name={icon} size={18} color={color} />
+          )
         ) : (
-          <Text style={[styles.btnText, active && styles.btnTextActive]}>
+          <Text
+            style={[
+              styles.btnText,
+              active && styles.btnTextActive,
+              labelStyle,
+            ]}>
             {label}
           </Text>
         )}
@@ -106,22 +140,26 @@ export default function TabToolbar({
     return (
       <>
         <Btn
-          icon="text"
+          label="B"
+          labelStyle={{fontWeight: '700', fontSize: 15}}
           active={isBold}
           onPress={() => onFormat('bold', !isBold)}
         />
         <Btn
-          icon="italic"
+          label="I"
+          labelStyle={{fontStyle: 'italic', fontSize: 15}}
           active={isItalic}
           onPress={() => onFormat('italic', !isItalic)}
         />
         <Btn
-          icon="underline"
+          label="U"
+          labelStyle={{textDecorationLine: 'underline', fontSize: 15}}
           active={isUnderline}
           onPress={() => onFormat('underline', !isUnderline)}
         />
         <Btn
-          icon="strikethrough"
+          label="S"
+          labelStyle={{textDecorationLine: 'line-through', fontSize: 15}}
           active={isStrike}
           onPress={() => onFormat('strike', !isStrike)}
         />
@@ -199,7 +237,11 @@ export default function TabToolbar({
         <Btn label="H3" onPress={() => onFormat('header', 3)} />
         <Divider />
         <Btn icon="list" onPress={() => onFormat('list', 'bullet')} />
-        <Btn icon="list-numbered" onPress={() => onFormat('list', 'ordered')} />
+        <Btn
+          icon="format-list-numbered"
+          iconSet="mci"
+          onPress={() => onFormat('list', 'ordered')}
+        />
         <Btn icon="checkbox" onPress={() => onFormat('list', 'check')} />
         <Divider />
         <Btn icon="grid-outline" onPress={onInsertTable} />
@@ -213,16 +255,37 @@ export default function TabToolbar({
   function renderLayoutTab() {
     return (
       <>
-        <Btn icon="align-left" onPress={() => onFormat('align', false)} />
-        <Btn icon="align-center" onPress={() => onFormat('align', 'center')} />
-        <Btn icon="align-right" onPress={() => onFormat('align', 'right')} />
         <Btn
-          icon="align-justify"
+          icon="format-align-left"
+          iconSet="mci"
+          onPress={() => onFormat('align', false)}
+        />
+        <Btn
+          icon="format-align-center"
+          iconSet="mci"
+          onPress={() => onFormat('align', 'center')}
+        />
+        <Btn
+          icon="format-align-right"
+          iconSet="mci"
+          onPress={() => onFormat('align', 'right')}
+        />
+        <Btn
+          icon="format-align-justify"
+          iconSet="mci"
           onPress={() => onFormat('align', 'justify')}
         />
         <Divider />
-        <Btn icon="indent-increase" onPress={() => onFormat('indent', '+1')} />
-        <Btn icon="indent-decrease" onPress={() => onFormat('indent', '-1')} />
+        <Btn
+          icon="format-indent-increase"
+          iconSet="mci"
+          onPress={() => onFormat('indent', '+1')}
+        />
+        <Btn
+          icon="format-indent-decrease"
+          iconSet="mci"
+          onPress={() => onFormat('indent', '-1')}
+        />
         <Divider />
         {PAPER_SIZES.map(s => (
           <Btn
@@ -239,10 +302,17 @@ export default function TabToolbar({
   function renderReferencesTab() {
     return (
       <>
+        <Btn label="TOC" onPress={onInsertToc} />
+        <Btn label="Footnote" onPress={onInsertFootnote} />
+        <Divider />
         <Btn icon="document-text-outline" onPress={onCitations} />
         <Divider />
         <Btn icon="link" onPress={onOpenLink} />
-        <Btn icon="superscript" onPress={() => onFormat('script', 'super')} />
+        <Btn
+          icon="format-superscript"
+          iconSet="mci"
+          onPress={() => onFormat('script', 'super')}
+        />
       </>
     );
   }
@@ -256,6 +326,8 @@ export default function TabToolbar({
         <Btn icon="arrow-redo" onPress={onRedo} />
         <Divider />
         <Btn icon="search" onPress={onFindReplace} />
+        <Divider />
+        <Btn icon="time-outline" onPress={onSnapshots} />
         <Divider />
         <Btn icon="sparkles" onPress={onAiAction} />
         <Divider />
@@ -319,15 +391,26 @@ export default function TabToolbar({
         ))}
       </ScrollView>
 
-      {/* Controls row */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.controlRow}
-        contentContainerStyle={styles.controlRowContent}
-        keyboardShouldPersistTaps="always">
-        {renderContent()}
-      </ScrollView>
+      {/* Controls row + Home-tab styles row */}
+      <View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.controlRow}
+          contentContainerStyle={styles.controlRowContent}
+          keyboardShouldPersistTaps="always">
+          {renderContent()}
+        </ScrollView>
+        {activeTab === 'Home' && (
+          <StyleBar
+            onStyle={onStyle}
+            fontSize={fontSize}
+            font={fontKey}
+            onFontChange={onFontChange}
+            onFontSizeChange={onFontSizeChange}
+          />
+        )}
+      </View>
     </View>
   );
 }

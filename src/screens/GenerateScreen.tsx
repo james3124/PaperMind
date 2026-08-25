@@ -1,13 +1,5 @@
 import React, {useState, useCallback} from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import {View, Text, TextInput, ScrollView, StyleSheet} from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '@/navigation/AppNavigator';
@@ -106,9 +98,7 @@ export default function GenerateScreen({navigation}: Props) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.flex, {backgroundColor: palette.bg}]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <View style={[styles.flex, {backgroundColor: palette.bg}]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -223,7 +213,7 @@ export default function GenerateScreen({navigation}: Props) {
         onConfirm={handleCitationConfirm}
         onDismiss={() => setShowCitation(false)}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

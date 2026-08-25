@@ -9,20 +9,62 @@
         --page-width: 210mm;
         --page-height: 297mm;
       }
+
       html,
-      body,
-      #superdoc {
-        background: #ffffff;
+      body {
         margin: 0;
         padding: 0;
+        overflow-x: hidden;
       }
-      body.dark,
-      body.dark #superdoc {
-        background: #1f2937;
+
+      /* Gray canvas area around pages — like Word/Docs */
+      body {
+        background: #d1d5db;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 16px 0 48px;
+        min-height: 100vh;
       }
+
+      body.dark {
+        background: #111827;
+      }
+
+      #superdoc {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      /* Each page is a white card, centered */
       .superdoc-page {
         width: var(--page-width);
         min-height: var(--page-height);
+        background: #ffffff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+        margin-bottom: 16px;
+        flex-shrink: 0;
+      }
+
+      body.dark .superdoc-page {
+        background: #1f2937;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      }
+
+      /* Prevent iOS/Android callout on non-text areas */
+      #superdoc-toolbar,
+      .superdoc-menu,
+      [contenteditable='false'] {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      /* Keep text selection working inside the editor */
+      [contenteditable='true'] {
+        -webkit-user-select: text;
+        user-select: text;
       }
     </style>
       <meta name="superdoc-worker-entry" content="assets/browser-worker-entry-BoOpGM21.js" />
@@ -30,6 +72,66 @@
   <body>
     <div id="superdoc-toolbar"></div>
     <div id="superdoc"></div>
+    <script>
+      // Prevent desktop-style right-click/long-press context menu.
+      // Android handles clipboard actions natively via selection handles.
+      document.addEventListener(
+        'contextmenu',
+        function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        },
+        true
+      );
+    </script>
+    <script>
+      // Scroll-vs-tap detector: a drag gesture immediately blurs any focused
+      // element so the keyboard never pops up while reading. A clean short
+      // tap is unaffected, so tapping to type still focuses normally.
+      (function () {
+        var SCROLL_THRESHOLD = 8; // px of movement = scroll, not tap
+        var touchStartX = 0;
+        var touchStartY = 0;
+        var didScroll = false;
+
+        document.addEventListener(
+          'touchstart',
+          function (e) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            didScroll = false;
+          },
+          { passive: true }
+        );
+
+        document.addEventListener(
+          'touchmove',
+          function (e) {
+            if (didScroll) return; // already handled for this gesture
+            var dx = Math.abs(e.touches[0].clientX - touchStartX);
+            var dy = Math.abs(e.touches[0].clientY - touchStartY);
+            if (dy > SCROLL_THRESHOLD || dx > SCROLL_THRESHOLD) {
+              didScroll = true;
+              var active = document.activeElement;
+              if (active && active !== document.body) {
+                active.blur();
+              }
+            }
+          },
+          { passive: true }
+        );
+
+        // Reset on finger lift — next tap can focus normally.
+        document.addEventListener(
+          'touchend',
+          function () {
+            didScroll = false;
+          },
+          { passive: true }
+        );
+      })();
+    </script>
     <script src="superdoc.js"></script>
   </body>
 </html>

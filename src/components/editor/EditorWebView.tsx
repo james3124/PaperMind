@@ -256,7 +256,7 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
       onlyArchivedExtension={false}
       onMessage={onMessage}
       onLoadEnd={handleLoadEnd}
-      keyboardDisplayRequiresUserAction={false}
+      keyboardDisplayRequiresUserAction={true}
       scalesPageToFit={Platform.OS === 'ios'}
       scrollEnabled={true}
       allowsInlineMediaPlayback

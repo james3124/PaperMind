@@ -29,7 +29,6 @@ import {extractDocxText} from '@/services/docxText';
 import {takePendingMarkdown} from '@/services/pipelineService';
 import EditorWebView, {EditorRef} from '@/components/editor/EditorWebView';
 import TabToolbar from '@/components/editor/TabToolbar';
-import StyleBar from '@/components/editor/StyleBar';
 import {DEFAULT_FONT_KEY} from '@/components/editor/fonts';
 import OutlinePanel from '@/components/editor/OutlinePanel';
 import FindReplaceBar from '@/components/editor/FindReplaceBar';
@@ -639,17 +638,6 @@ export default function EditorScreen({route, navigation}: Props) {
         <TouchableOpacity onPress={handleOutline}>
           <Text style={styles.iconBtn}>☰</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => editorRef.current?.insertToc()}>
-          <Text style={[styles.toolBtn, isDark && styles.darkText]}>TOC</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setShowFootnote(true)}>
-          <Text style={[styles.toolBtn, isDark && styles.darkText]}>
-            Footnote
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={openSnapshots}>
-          <Text style={styles.iconBtn}>🕘</Text>
-        </TouchableOpacity>
       </View>
 
       {showFind && (
@@ -690,13 +678,12 @@ export default function EditorScreen({route, navigation}: Props) {
         onAiAction={() => setShowAi(true)}
         onCitations={() => setShowCitations(true)}
         onChat={() => setShowChat(true)}
-        wordCount={wordCount}
-      />
-
-      <StyleBar
-        onStyle={(key, value) => editorRef.current?.format(key, value)}
+        onInsertToc={() => editorRef.current?.insertToc()}
+        onInsertFootnote={() => setShowFootnote(true)}
+        onSnapshots={openSnapshots}
         fontSize={fontSize}
-        font={fontKey}
+        fontKey={fontKey}
+        onStyle={(key, value) => editorRef.current?.format(key, value)}
         onFontChange={key => {
           setFontKey(key);
           editorRef.current?.format('font', key);
@@ -705,6 +692,7 @@ export default function EditorScreen({route, navigation}: Props) {
           setFontSize(s);
           editorRef.current?.format('size', `${s}px`);
         }}
+        wordCount={wordCount}
       />
 
       <KeyboardAvoidingView
@@ -955,7 +943,6 @@ const styles = StyleSheet.create({
   saveChipSaved: {backgroundColor: '#10b981'},
   saveChipText: {color: '#fff', fontSize: 11, fontWeight: '600'},
   darkBg: {backgroundColor: '#111827'},
-  toolBtn: {fontSize: 12, fontWeight: '600', color: '#6366f1'},
   overlay: {
     flex: 1,
     justifyContent: 'center',

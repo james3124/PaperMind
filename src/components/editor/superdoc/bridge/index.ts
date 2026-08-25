@@ -16,6 +16,21 @@ import {
   resolveFootnoteSchema,
   tocParagraphs,
 } from './tocFootnotes';
+import {
+  docFormatCommand,
+  docInsertText,
+  docInsertMarkdown,
+  docUndo,
+  docRedo,
+  docInsertImage,
+  docInsertTable,
+  docTableCommand,
+  docInsertToc,
+  docInsertFootnote,
+  docSetPaperSize,
+} from './docCommands';
+import {reportCmdError} from './docApi';
+import {getEditor, post} from './runtime';
 
 const tracker = createSaveStateTracker();
 // Highest footnote number handed out in this document session; reset on
@@ -23,11 +38,6 @@ const tracker = createSaveStateTracker();
 let footnotesUsed = 0;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 const pendingExports = new Map<string, (b64: string) => void>();
-
-function getEditor(): any {
-  const sd = (window as any).__sd;
-  return sd ? sd.activeEditor ?? sd.editor ?? sd.editors?.[0] : null;
-}
 
 async function serializeAndPost(
   kind: 'autosave' | 'reply',
@@ -241,13 +251,6 @@ function attachEditorListeners(attempt = 0): void {
   post({type: 'format-change', format: currentFormats(ed)});
 }
 
-export function post(msg: Record<string, unknown>): void {
-  const rn = (window as any).ReactNativeWebView;
-  if (rn) {
-    rn.postMessage(JSON.stringify(msg));
-  }
-}
-
 declare global {
   interface Window {
     __handleMessage?: (data: string) => void;
@@ -375,44 +378,88 @@ window.__handleMessage = (data: string) => {
   }
   switch (cmd.cmd) {
     case 'format': {
-      const ed = getEditor();
-      if (!ed || !applyFormat(ed, cmd.key, cmd.value)) {
-        post({type: 'cmd-error', cmd: 'format'});
+      // v2 Document API first; fall back to the v1 TipTap surface when the
+      // facade is missing or rejects the operation.
+      const docErr = docFormatCommand(cmd.key, cmd.value);
+      if (docErr == null) {
+        break;
       }
+      const ed = getEditor();
+      if (ed && applyFormat(ed, cmd.key, cmd.value)) {
+        break;
+      }
+      reportCmdError('format', docErr ?? 'no editor');
       break;
     }
     case 'insertText': {
-      const ed = getEditor();
-      if (ed) {
-        ed.commands.insertContent(cmd.text);
+      const text = typeof cmd.text === 'string' ? cmd.text : null;
+      const docErr = text == null ? 'missing text' : docInsertText(text);
+      if (docErr == null) {
+        break;
       }
+      const ed = getEditor();
+      if (
+        ed &&
+        text != null &&
+        typeof ed.commands?.insertContent === 'function'
+      ) {
+        ed.commands.insertContent(text);
+        break;
+      }
+      reportCmdError('insertText', docErr ?? 'no editor');
       break;
     }
     case 'insertMarkdown': {
+      const md = typeof cmd.md === 'string' ? cmd.md : null;
+      const docErr = md == null ? 'missing markdown' : docInsertMarkdown(md);
+      if (docErr == null) {
+        break;
+      }
       const ed = getEditor();
-      if (ed && typeof cmd.md === 'string') {
+      if (ed && md != null) {
         try {
-          ed.commands.insertContent(markdownToBlocks(cmd.md));
+          ed.commands.insertContent(markdownToBlocks(md));
+          break;
         } catch (e: unknown) {
-          post({type: 'cmd-error', cmd: 'insertMarkdown'});
+          reportCmdError('insertMarkdown', String(e));
           post({type: 'error', message: String(e)});
+          break;
         }
       }
+      reportCmdError('insertMarkdown', docErr ?? 'no editor');
       break;
     }
     case 'undo':
     case 'redo': {
-      const ed = getEditor();
-      if (ed) {
-        ed.commands[cmd.cmd]();
+      const docErr = cmd.cmd === 'undo' ? docUndo() : docRedo();
+      if (docErr == null) {
+        break;
       }
+      const ed = getEditor();
+      if (ed && typeof ed.commands?.[cmd.cmd] === 'function') {
+        ed.commands[cmd.cmd]();
+        break;
+      }
+      reportCmdError(cmd.cmd, docErr ?? 'no editor');
       break;
     }
     case 'insertImage': {
-      const ed = getEditor();
-      if (ed && typeof cmd.dataUrl === 'string') {
-        ed.commands.setImage({src: cmd.dataUrl});
+      const dataUrl = typeof cmd.dataUrl === 'string' ? cmd.dataUrl : null;
+      const docErr =
+        dataUrl == null ? 'missing image data' : docInsertImage(dataUrl);
+      if (docErr == null) {
+        break;
       }
+      const ed = getEditor();
+      if (
+        ed &&
+        dataUrl != null &&
+        typeof ed.commands?.setImage === 'function'
+      ) {
+        ed.commands.setImage({src: dataUrl});
+        break;
+      }
+      reportCmdError('insertImage', docErr ?? 'no editor');
       break;
     }
     case 'setTheme': {
@@ -420,19 +467,28 @@ window.__handleMessage = (data: string) => {
       break;
     }
     case 'insertTable': {
+      const rows = Number(cmd.rows);
+      const cols = Number(cmd.cols);
+      const docErr =
+        Number.isFinite(rows) && Number.isFinite(cols)
+          ? docInsertTable(rows, cols)
+          : 'missing table dimensions';
+      if (docErr == null) {
+        break;
+      }
       const ed = getEditor();
-      if (!ed) {
-        post({type: 'cmd-error', cmd: 'insertTable'});
+      if (!ed || typeof ed.commands?.insertTable !== 'function') {
+        reportCmdError('insertTable', docErr ?? 'no editor');
         break;
       }
       try {
         ed.commands.insertTable({
-          rows: Number(cmd.rows) + 1,
-          cols: Number(cmd.cols),
+          rows: rows + 1,
+          cols,
           withHeaderRow: true,
         });
       } catch (e: unknown) {
-        post({type: 'cmd-error', cmd: 'insertTable'});
+        reportCmdError('insertTable', String(e));
         post({type: 'error', message: String(e)});
       }
       break;
@@ -442,6 +498,11 @@ window.__handleMessage = (data: string) => {
     case 'deleteTableRow':
     case 'deleteTableColumn':
     case 'deleteTable': {
+      // Document API against the live table context first.
+      const docErr = docTableCommand(cmd.cmd);
+      if (docErr == null) {
+        break;
+      }
       const ed = getEditor();
       const tableCmd: Record<string, string> = {
         addTableRow: 'addRowAfter',
@@ -452,14 +513,14 @@ window.__handleMessage = (data: string) => {
       };
       const fn = tableCmd[cmd.cmd];
       if (!ed || typeof ed.commands?.[fn] !== 'function') {
-        post({type: 'cmd-error', cmd: cmd.cmd});
+        reportCmdError(cmd.cmd, docErr ?? 'no editor');
         break;
       }
       try {
         ed.commands[fn]();
       } catch (e: unknown) {
         // table mutations throw when the caret is outside a table
-        post({type: 'cmd-error', cmd: cmd.cmd});
+        reportCmdError(cmd.cmd, String(e));
         post({type: 'error', message: String(e)});
       }
       break;
@@ -467,13 +528,14 @@ window.__handleMessage = (data: string) => {
     case 'insertPageBreak': {
       const ed = getEditor();
       if (!ed || !ed.state?.schema?.nodes || !ed.state.schema.nodes.pageBreak) {
-        post({type: 'cmd-error', cmd: 'insertPageBreak'});
+        reportCmdError('insertPageBreak', 'pageBreak node unavailable');
         break;
       }
       try {
+        ed.commands.focus();
         ed.commands.insertContent({type: 'pageBreak'});
       } catch (e: unknown) {
-        post({type: 'cmd-error', cmd: 'insertPageBreak'});
+        reportCmdError('insertPageBreak', String(e));
         post({type: 'error', message: String(e)});
       }
       break;
@@ -491,6 +553,13 @@ window.__handleMessage = (data: string) => {
         // Unknown sizes silently fell back to A4 before; keep the behavior
         // but make it diagnosable from logcat.
         console.warn(`[superdoc] unknown paper size "${requested}", using a4`);
+      }
+      // The v2 layout engine derives page geometry from DOCX section
+      // properties, so the real change happens through sections.setPageSetup.
+      // The CSS variables stay in sync purely as shell defaults.
+      const docErr = docSetPaperSize(requested || 'a4');
+      if (docErr != null) {
+        reportCmdError('setPaperSize', docErr);
       }
       document.documentElement.style.setProperty('--page-width', size[0]);
       document.documentElement.style.setProperty('--page-height', size[1]);
@@ -616,9 +685,14 @@ window.__handleMessage = (data: string) => {
       break;
     }
     case 'insertToc': {
+      // Prefer a real TOC field through create.tableOfContents.
+      const docErr = docInsertToc();
+      if (docErr == null) {
+        break;
+      }
       const ed = getEditor();
       if (!ed) {
-        post({type: 'cmd-error', cmd: 'insertToc'});
+        reportCmdError('insertToc', docErr ?? 'no editor');
         break;
       }
       try {
@@ -628,17 +702,29 @@ window.__handleMessage = (data: string) => {
         // Legacy parity: a document with no headings gets no TOC.
         if (headings.length > 0) {
           ed.commands.insertContent(tocParagraphs(headings));
+        } else {
+          reportCmdError('insertToc', 'document has no headings');
         }
       } catch (e: unknown) {
-        post({type: 'cmd-error', cmd: 'insertToc'});
+        reportCmdError('insertToc', String(e));
         post({type: 'error', message: String(e)});
       }
       break;
     }
     case 'insertFootnote': {
+      const text = typeof cmd.text === 'string' ? cmd.text : null;
+      if (text == null) {
+        reportCmdError('insertFootnote', 'missing footnote text');
+        break;
+      }
+      // The host runtime inserts at the caret natively — prefer that.
+      const docErr = docInsertFootnote(text);
+      if (docErr == null) {
+        break;
+      }
       const ed = getEditor();
-      if (!ed || typeof cmd.text !== 'string') {
-        post({type: 'cmd-error', cmd: 'insertFootnote'});
+      if (!ed) {
+        reportCmdError('insertFootnote', docErr ?? 'no editor');
         break;
       }
       try {
@@ -646,17 +732,17 @@ window.__handleMessage = (data: string) => {
         if (shape.hasFootnoteNode) {
           // Native footnote node numbers itself; the manual counter stays
           // untouched so it never drifts if both paths are ever mixed.
-          ed.commands.insertContent(footnoteContent(0, cmd.text, shape));
+          ed.commands.insertContent(footnoteContent(0, text, shape));
         } else {
           // Increment only after the dispatch succeeded so a failed
           // insert never burns a footnote number.
           ed.commands.insertContent(
-            footnoteContent(footnotesUsed + 1, cmd.text, shape),
+            footnoteContent(footnotesUsed + 1, text, shape),
           );
           footnotesUsed += 1;
         }
       } catch (e: unknown) {
-        post({type: 'cmd-error', cmd: 'insertFootnote'});
+        reportCmdError('insertFootnote', String(e));
         post({type: 'error', message: String(e)});
       }
       break;
