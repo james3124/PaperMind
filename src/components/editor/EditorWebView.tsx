@@ -130,7 +130,6 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
   const dark = props.dark === true;
   useEffect(() => {
     postCmd({cmd: 'setTheme', dark});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dark]);
 
   // Paper size: same pattern as dark mode, so a persisted Letter/A5/A3 is
@@ -140,7 +139,6 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
     if (props.paperSize) {
       postCmd({cmd: 'setPaperSize', paperSize: props.paperSize});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.paperSize]);
 
   useImperativeHandle(ref, () => ({
@@ -247,6 +245,11 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
       source={{uri: EDITOR_URL}}
       originWhitelist={['*']}
       allowFileAccess={true}
+      // The editor shell fetches its DOCX-engine worker script from the same
+      // file:// asset tree; without these Android settings the fetch is
+      // blocked and the engine falls back to an empty stub.
+      allowFileAccessFromFileURLs={true}
+      allowUniversalAccessFromFileURLs={true}
       onlyArchivedExtension={false}
       onMessage={onMessage}
       onLoadEnd={handleLoadEnd}

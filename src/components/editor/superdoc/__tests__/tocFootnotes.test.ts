@@ -117,8 +117,14 @@ describe('tocFootnotes', () => {
     expect(src).toContain("cmd.cmd === 'loadBlank'");
     // Each load path must reset the counter immediately before remounting,
     // so a replaced document never inherits the old footnote numbering.
+    // (Mounts go through prepareEngineWorker().then(() => __mount) — the
+    // engine-worker override global has to be installed before SuperDoc
+    // boots — so the reset is what sits directly on the load paths.)
     expect(
-      src.match(/footnotesUsed = 0;\s*\n\s*window\.__mount!/g),
+      src.match(/footnotesUsed = 0;\s*\n\s*void prepareEngineWorker\(\)/g),
+    ).toHaveLength(2);
+    expect(
+      src.match(/prepareEngineWorker\(\)\.then\(\(\) => window\.__mount!/g),
     ).toHaveLength(2);
   });
 });

@@ -4,6 +4,7 @@ import 'superdoc/style.css';
 import {blobToBase64} from './exporter';
 import {applyFormat, currentFormats} from './formatCommands';
 import {createSaveStateTracker} from './saveState';
+import {installEngineWorkerUrl, readWorkerEntryMeta} from './engineWorker';
 import {markdownToBlocks} from '@/utils/markdownToDocxFragments';
 import {
   collectHeadings,
@@ -261,6 +262,25 @@ declare global {
  */
 let mountedWithDocument = false;
 
+// The DOCX engine boots a module worker; without the documented override
+// global its import.meta-based URL resolution throws under this classic
+// (non-module) bundle and SuperDoc mounts an empty stub. Prepare once, then
+// let every mount reuse it. Failures are non-fatal: startSuperDoc still runs
+// and reports engine errors through the normal error channel.
+let enginePrepared: Promise<void> | null = null;
+
+function prepareEngineWorker(): Promise<void> {
+  if (!enginePrepared) {
+    enginePrepared = installEngineWorkerUrl({
+      entryPath: readWorkerEntryMeta(document),
+    }).then(
+      () => undefined,
+      () => undefined,
+    );
+  }
+  return enginePrepared;
+}
+
 function startSuperDoc(b64?: string): void {
   // A pending word-count post from the outgoing document must never fire
   // against the replacement doc.
@@ -335,11 +355,11 @@ window.__handleMessage = (data: string) => {
   }
   if (cmd.cmd === 'load' && typeof cmd.b64 === 'string') {
     footnotesUsed = 0;
-    window.__mount!(cmd.b64);
+    void prepareEngineWorker().then(() => window.__mount!(cmd.b64));
   }
   if (cmd.cmd === 'loadBlank') {
     footnotesUsed = 0;
-    window.__mount!();
+    void prepareEngineWorker().then(() => window.__mount!());
   }
   if (cmd.cmd === 'exportNow') {
     const requestId = cmd.requestId ?? '0';
