@@ -8,8 +8,6 @@
 
 <div align="center">
 
-# 📚 PaperMind
-
 **Write, generate, and edit complete academic research papers — entirely on your phone.**
 
 PaperMind is an AI research-paper studio for Android. The entire AI pipeline runs **on-device** by default using a local large language model — so your research stays private and works anywhere, even without an internet connection. Optionally connect **any OpenAI-compatible API** (your own key, your own provider) for faster, higher-quality generation with automatic on-device fallback.
