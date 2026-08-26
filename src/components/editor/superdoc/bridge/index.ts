@@ -121,16 +121,21 @@ function scheduleWordCount(ed: any): void {
 }
 
 function emitWordCount(ed: any): void {
-  const text = ed.state.doc.textBetween(
-    0,
-    ed.state.doc.content.size,
-    '\n',
-    ' ',
-  );
-  post({
-    type: 'content-change',
-    wordCount: text.split(/\s+/).filter(Boolean).length,
-  });
+  try {
+    const text = ed.state.doc.textBetween(
+      0,
+      ed.state.doc.content.size,
+      '\n',
+      ' ',
+    );
+    post({
+      type: 'content-change',
+      wordCount: text.split(/\s+/).filter(Boolean).length,
+    });
+  } catch {
+    // v2 facades without a PM state surface cannot count here; the
+    // 'ready' handshake must still proceed.
+  }
 }
 /**
  * Replaces every occurrence of `find` with `replace`, including occurrences
@@ -225,30 +230,54 @@ function attachEditorListeners(attempt = 0): void {
     return;
   }
   wiredEditors.add(ed);
-  ed.on('update', () => {
-    markDirty();
-    scheduleWordCount(ed);
-  });
-  // Toolbar state must track the caret/selection, and the AI panel needs the
-  // selected text (empty selection closes it). Also emitted once right after
-  // attach so StyleBar highlights are correct before any navigation.
-  lastSelKey = '';
-  ed.on('selectionUpdate', () => {
-    post({type: 'format-change', format: currentFormats(ed)});
-    const sel = ed.state?.selection;
-    if (!sel) {
-      return;
-    }
-    const key = `${sel.from}:${sel.to}`;
-    if (key !== lastSelKey) {
-      lastSelKey = key;
-      const text = sel.empty
-        ? ''
-        : ed.state.doc.textBetween(sel.from, sel.to, '\n');
-      post({type: 'selection-text', text});
-    }
-  });
-  post({type: 'format-change', format: currentFormats(ed)});
+  // v2 facades may not expose the event-emitter/PM surfaces at all; every
+  // access below is guarded so a missing surface degrades toolbar state
+  // reporting instead of killing the 'ready' handshake.
+  try {
+    ed.on('update', () => {
+      markDirty();
+      scheduleWordCount(ed);
+    });
+    // Toolbar state must track the caret/selection, and the AI panel needs
+    // the selected text (empty selection closes it). Also emitted once right
+    // after attach so StyleBar highlights are correct before any navigation.
+    lastSelKey = '';
+    ed.on('selectionUpdate', () => {
+      let format: Record<string, unknown> = {};
+      try {
+        format = currentFormats(ed);
+      } catch {
+        // facade without TipTap helpers — report an empty snapshot
+      }
+      post({type: 'format-change', format});
+      const sel = ed.state?.selection;
+      if (!sel) {
+        return;
+      }
+      const key = `${sel.from}:${sel.to}`;
+      if (key !== lastSelKey) {
+        lastSelKey = key;
+        const text = sel.empty
+          ? ''
+          : ed.state.doc.textBetween(sel.from, sel.to, '\n');
+        post({type: 'selection-text', text});
+      }
+    });
+  } catch (e: unknown) {
+    post({
+      type: 'engine-debug',
+      message: `listener wiring degraded: ${
+        e instanceof Error ? e.message : String(e)
+      }`,
+    });
+  }
+  let initialFormat: Record<string, unknown> = {};
+  try {
+    initialFormat = currentFormats(ed);
+  } catch {
+    // as above
+  }
+  post({type: 'format-change', format: initialFormat});
 }
 
 declare global {
@@ -303,7 +332,9 @@ function startSuperDoc(b64?: string): void {
   // With no document supplied, SuperDoc starts a blank DOCX.
   (window as any).__sd = new SuperDoc({
     selector: '#superdoc',
-    toolbar: '#superdoc-toolbar',
+    // SuperDoc must not render its own toolbar — the native TabToolbar
+    // already covers every action it offers.
+    toolbar: false,
     documentMode: 'editing',
     ...(docFile ? {document: docFile} : {}),
     onReady: () => {
@@ -354,6 +385,40 @@ window.__mount = (b64?: string) => {
   }
 };
 
+/**
+ * Re-focus the editor so selection-dependent commands keep working after a
+ * native toolbar tap steals touch focus from the WebView. Best-effort and
+ * never throws: the TipTap focus command is preferred (restores the caret at
+ * its last position); the raw ProseMirror view focus is the fallback for
+ * builds without that command.
+ */
+function refocusEditor(): void {
+  const ed = getEditor();
+  if (!ed) {
+    return;
+  }
+  try {
+    // v2 editor facades expose focus() directly (commands/view are null on
+    // them); the TipTap/PM surfaces remain as last-resort fallbacks.
+    if (typeof ed.focus === 'function') {
+      ed.focus();
+      return;
+    }
+    const sd = (window as any).__sd;
+    if (typeof sd?.focus === 'function') {
+      sd.focus();
+      return;
+    }
+    if (typeof ed.commands?.focus === 'function') {
+      ed.commands.focus();
+      return;
+    }
+    ed.view?.focus?.();
+  } catch {
+    // focus restoration is best-effort; it must never block the command
+  }
+}
+
 window.__handleMessage = (data: string) => {
   let cmd: any;
   try {
@@ -378,6 +443,7 @@ window.__handleMessage = (data: string) => {
   }
   switch (cmd.cmd) {
     case 'format': {
+      refocusEditor();
       // v2 Document API first; fall back to the v1 TipTap surface when the
       // facade is missing or rejects the operation.
       const docErr = docFormatCommand(cmd.key, cmd.value);
@@ -392,6 +458,7 @@ window.__handleMessage = (data: string) => {
       break;
     }
     case 'insertText': {
+      refocusEditor();
       const text = typeof cmd.text === 'string' ? cmd.text : null;
       const docErr = text == null ? 'missing text' : docInsertText(text);
       if (docErr == null) {
@@ -410,6 +477,7 @@ window.__handleMessage = (data: string) => {
       break;
     }
     case 'insertMarkdown': {
+      refocusEditor();
       const md = typeof cmd.md === 'string' ? cmd.md : null;
       const docErr = md == null ? 'missing markdown' : docInsertMarkdown(md);
       if (docErr == null) {
@@ -431,6 +499,7 @@ window.__handleMessage = (data: string) => {
     }
     case 'undo':
     case 'redo': {
+      refocusEditor();
       const docErr = cmd.cmd === 'undo' ? docUndo() : docRedo();
       if (docErr == null) {
         break;
@@ -444,6 +513,7 @@ window.__handleMessage = (data: string) => {
       break;
     }
     case 'insertImage': {
+      refocusEditor();
       const dataUrl = typeof cmd.dataUrl === 'string' ? cmd.dataUrl : null;
       const docErr =
         dataUrl == null ? 'missing image data' : docInsertImage(dataUrl);
@@ -467,6 +537,7 @@ window.__handleMessage = (data: string) => {
       break;
     }
     case 'insertTable': {
+      refocusEditor();
       const rows = Number(cmd.rows);
       const cols = Number(cmd.cols);
       const docErr =
@@ -498,6 +569,7 @@ window.__handleMessage = (data: string) => {
     case 'deleteTableRow':
     case 'deleteTableColumn':
     case 'deleteTable': {
+      refocusEditor();
       // Document API against the live table context first.
       const docErr = docTableCommand(cmd.cmd);
       if (docErr == null) {
@@ -526,6 +598,7 @@ window.__handleMessage = (data: string) => {
       break;
     }
     case 'insertPageBreak': {
+      refocusEditor();
       const ed = getEditor();
       if (!ed || !ed.state?.schema?.nodes || !ed.state.schema.nodes.pageBreak) {
         reportCmdError('insertPageBreak', 'pageBreak node unavailable');
@@ -560,9 +633,12 @@ window.__handleMessage = (data: string) => {
       const docErr = docSetPaperSize(requested || 'a4');
       if (docErr != null) {
         reportCmdError('setPaperSize', docErr);
+      } else {
+        // Shell defaults stay in sync only after the real (section-level)
+        // change succeeded.
+        document.documentElement.style.setProperty('--page-width', size[0]);
+        document.documentElement.style.setProperty('--page-height', size[1]);
       }
-      document.documentElement.style.setProperty('--page-width', size[0]);
-      document.documentElement.style.setProperty('--page-height', size[1]);
       break;
     }
     case 'getHeadings': {
@@ -685,6 +761,7 @@ window.__handleMessage = (data: string) => {
       break;
     }
     case 'insertToc': {
+      refocusEditor();
       // Prefer a real TOC field through create.tableOfContents.
       const docErr = docInsertToc();
       if (docErr == null) {
@@ -712,6 +789,7 @@ window.__handleMessage = (data: string) => {
       break;
     }
     case 'insertFootnote': {
+      refocusEditor();
       const text = typeof cmd.text === 'string' ? cmd.text : null;
       if (text == null) {
         reportCmdError('insertFootnote', 'missing footnote text');

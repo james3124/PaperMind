@@ -1,10 +1,15 @@
 import React, {forwardRef, useEffect, useImperativeHandle, useRef} from 'react';
-import {StyleSheet, Platform} from 'react-native';
+import {StyleSheet, Platform, Linking} from 'react-native';
 import WebView, {WebViewMessageEvent} from 'react-native-webview';
 import {loadPaperDocx} from '@/services/paperFileStore';
 import type {PaperSize} from '@/stores/settingsStore';
 
 const EDITOR_URL = 'file:///android_asset/superdoc/index.html';
+// Everything the editor shell may load itself (assets, blob workers,
+// data URLs) stays inside the WebView; any other navigation — e.g. a
+// hyperlink planted in an imported DOCX — is handed to the OS instead of
+// replacing the trusted file:// page.
+const ALLOWED_PREFIX = 'file:///android_asset/superdoc/';
 
 export interface EditorRef {
   format: (key: string, value: unknown) => void;
@@ -256,6 +261,13 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
       onlyArchivedExtension={false}
       onMessage={onMessage}
       onLoadEnd={handleLoadEnd}
+      onShouldStartLoadWithRequest={req => {
+        if (req.url.startsWith(ALLOWED_PREFIX) || req.url === EDITOR_URL) {
+          return true;
+        }
+        Linking.openURL(req.url).catch(() => {});
+        return false;
+      }}
       keyboardDisplayRequiresUserAction={true}
       scalesPageToFit={Platform.OS === 'ios'}
       scrollEnabled={true}
@@ -266,8 +278,8 @@ const EditorWebView = forwardRef<EditorRef, Props>((props, ref) => {
       textZoom={100}
       setBuiltInZoomControls={true}
       setDisplayZoomControls={false}
-      minimumZoomScale={0.5}
-      maximumZoomScale={2.5}
+      minimumZoomScale={0.25}
+      maximumZoomScale={3.0}
       backgroundColor={dark ? '#111827' : '#ffffff'}
       androidLayerType="hardware"
       style={[styles.webview, {backgroundColor: dark ? '#111827' : '#ffffff'}]}

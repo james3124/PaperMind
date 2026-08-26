@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=0.5, minimum-scale=0.25, maximum-scale=3.0, user-scalable=yes" />
     <link rel="stylesheet" href="superdoc.css" />
     <style>
       :root {
@@ -51,6 +51,14 @@
       body.dark .superdoc-page {
         background: #1f2937;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      }
+
+      /* Hide SuperDoc's built-in toolbar — the native TabToolbar replaces
+         it. Safety net even though the bridge passes toolbar:false. */
+      #superdoc-toolbar {
+        display: none !important;
+        height: 0 !important;
+        overflow: hidden !important;
       }
 
       /* Prevent iOS/Android callout on non-text areas */

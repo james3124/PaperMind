@@ -89,6 +89,9 @@ function formatInline(
       return set(() => f.fontSize({target, value: UNSET(value) ? null : pt}));
     }
     case 'script':
+      if (!UNSET(value) && value !== 'super' && value !== 'sub') {
+        return `unsupported script value: ${String(value)}`;
+      }
       return set(() =>
         f.vertAlign({
           target,
@@ -276,8 +279,24 @@ function historyStep(fn: 'undo' | 'redo'): string | null {
   if (typeof doc?.history?.[fn] !== 'function') {
     return 'history api unavailable';
   }
-  const [ok, err] = tryDoc(() => doc.history[fn]());
-  return ok ? null : err ?? `${fn} failed`;
+  let result: unknown;
+  try {
+    result = doc.history[fn]();
+  } catch (e: unknown) {
+    return e instanceof Error ? e.message : String(e);
+  }
+  // HistoryActionResult carries noop/reason/status — never a .success flag.
+  const r = result as AnyObj | undefined;
+  if (
+    r &&
+    (r.success === false ||
+      r.noop === true ||
+      r.status === 'rejected' ||
+      r.status === 'partial')
+  ) {
+    return `${fn} rejected: ${String(r.reason ?? r.status ?? 'noop')}`;
+  }
+  return null;
 }
 
 export function docUndo(): string | null {
@@ -295,8 +314,10 @@ export function docInsertImage(dataUrl: string): string | null {
     return 'create.image unavailable';
   }
   const caret = caretPoint(doc);
+  // Location kinds require a BlockNodeAddress under `target` — a flat
+  // nodeId fails runtime validation ("requires at.target").
   const at = caret
-    ? {kind: 'after', nodeId: caret.blockId}
+    ? {kind: 'after', target: paragraphTarget(caret.blockId)}
     : {kind: 'documentEnd'};
   const [ok, err] = tryDoc(() => doc.create.image({src: dataUrl, at}));
   return ok ? null : err ?? 'image insert failed';
@@ -310,7 +331,11 @@ export function docInsertTable(rows: number, cols: number): string | null {
   }
   const caret = caretPoint(doc);
   const at: AnyObj = caret
-    ? {kind: 'inParagraph', nodeId: caret.blockId, offset: caret.offset}
+    ? {
+        kind: 'inParagraph',
+        target: paragraphTarget(caret.blockId),
+        offset: caret.offset,
+      }
     : {kind: 'documentEnd'};
   const [ok, err] = tryDoc(() => doc.create.table({rows, columns: cols, at}));
   if (ok) {
@@ -319,7 +344,7 @@ export function docInsertTable(rows: number, cols: number): string | null {
   // Some builds reject the split-paragraph location; retry anchored after
   // the caret block before giving up entirely.
   const fallbackAt = caret
-    ? {kind: 'after', nodeId: caret.blockId}
+    ? {kind: 'after', target: paragraphTarget(caret.blockId)}
     : {kind: 'documentEnd'};
   const [ok2, err2] = tryDoc(() =>
     doc.create.table({rows, columns: cols, at: fallbackAt}),
@@ -394,7 +419,7 @@ export function docInsertToc(): string | null {
   }
   const caret = caretPoint(doc);
   const at = caret
-    ? {kind: 'before', nodeId: caret.blockId}
+    ? {kind: 'before', target: paragraphTarget(caret.blockId)}
     : {kind: 'documentEnd'};
   const [ok, err] = tryDoc(() => doc.create.tableOfContents({at}));
   return ok ? null : err ?? 'toc insert failed';
@@ -406,7 +431,9 @@ export function docInsertFootnote(text: string): string | null {
   if (!doc?.footnotes?.insert) {
     return 'footnotes api unavailable';
   }
-  const [ok, err] = tryDoc(() => doc.footnotes.insert({content: text}));
+  const [ok, err] = tryDoc(() =>
+    doc.footnotes.insert({type: 'footnote', content: text}),
+  );
   return ok ? null : err ?? 'footnote insert failed';
 }
 

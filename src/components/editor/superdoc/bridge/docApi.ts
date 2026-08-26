@@ -63,17 +63,6 @@ export function caretPoint(
 }
 
 /** True when a mutation receipt reports success. */
-export function receiptOk(receipt: unknown): boolean {
-  if (receipt == null) {
-    // Absent receipt: treat as applied unless the caller proved otherwise.
-    return true;
-  }
-  if (typeof receipt === 'object' && 'success' in (receipt as AnyObj)) {
-    return (receipt as AnyObj).success === true;
-  }
-  return true;
-}
-
 /** Extract a human-readable failure reason from a receipt. */
 export function receiptError(receipt: unknown): string | null {
   if (
@@ -137,6 +126,7 @@ export function setPageSetupAllSections(
   if (!Array.isArray(items) || items.length === 0) {
     return 'no sections reported';
   }
+  let configured = 0;
   for (const item of items) {
     const sectionId =
       item?.address?.sectionId ?? item?.domain?.address?.sectionId;
@@ -154,6 +144,12 @@ export function setPageSetupAllSections(
     if (!ok) {
       return err ?? 'setPageSetup failed';
     }
+    configured += 1;
+  }
+  if (configured === 0) {
+    // Every item lacked a usable sectionId — nothing was applied, so this
+    // must not read as success.
+    return 'no sections could be addressed';
   }
   return null;
 }
